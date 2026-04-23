@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,26 +19,52 @@ import {
 
 import { db } from "@/lib/firebase";
 
+/* ================= TYPES ================= */
+
+type Sale = {
+  buyer: string;
+  amount: number;
+  date: string;
+};
+
+type Expense = {
+  desc: string;
+  amount: number;
+  date: string;
+};
+
+type Capital = {
+  id: string;
+  name: string;
+  capital: number;
+  sales: Sale[];
+  expenses: Expense[];
+};
+
+/* ================= COMPONENT ================= */
+
 export default function HustlePage() {
-  // CAPITAL
+  /* CAPITAL */
   const [capitalName, setCapitalName] = useState("");
   const [capitalAmount, setCapitalAmount] = useState("");
-  const [editCapitalId, setEditCapitalId] = useState(null);
+  const [editCapitalId, setEditCapitalId] = useState<string | null>(null);
 
-  // SALES
+  /* SALES */
   const [buyer, setBuyer] = useState("");
   const [amount, setAmount] = useState("");
-  const [editSaleIndex, setEditSaleIndex] = useState(null);
+  const [editSaleIndex, setEditSaleIndex] = useState<number | null>(null);
 
-  // EXPENSES
+  /* EXPENSES */
   const [expDesc, setExpDesc] = useState("");
   const [expAmount, setExpAmount] = useState("");
-  const [editExpIndex, setEditExpIndex] = useState(null);
+  const [editExpIndex, setEditExpIndex] = useState<number | null>(null);
 
-  const [capitals, setCapitals] = useState([]);
-  const [activeCapital, setActiveCapital] = useState(null);
+  /* DATA */
+  const [capitals, setCapitals] = useState<Capital[]>([]);
+  const [activeCapital, setActiveCapital] = useState<Capital | null>(null);
 
-  // LOAD DATA
+  /* ================= LOAD DATA ================= */
+
   useEffect(() => {
     const q = query(
       collection(db, "hustleCapitals"),
@@ -46,9 +72,9 @@ export default function HustlePage() {
     );
 
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({
+      const data: Capital[] = snap.docs.map((d) => ({
         id: d.id,
-        ...d.data(),
+        ...(d.data() as Omit<Capital, "id">),
         sales: d.data().sales || [],
         expenses: d.data().expenses || [],
       }));
@@ -66,7 +92,8 @@ export default function HustlePage() {
     if (updated) setActiveCapital(updated);
   }, [capitals, activeCapital?.id]);
 
-  // CAPITAL
+  /* ================= CAPITAL ================= */
+
   const saveCapital = async () => {
     if (!capitalName || !capitalAmount) return;
 
@@ -75,6 +102,7 @@ export default function HustlePage() {
         name: capitalName,
         capital: Number(capitalAmount),
       });
+
       setEditCapitalId(null);
     } else {
       await addDoc(collection(db, "hustleCapitals"), {
@@ -90,43 +118,41 @@ export default function HustlePage() {
     setCapitalAmount("");
   };
 
-  const deleteCapital = async (id) => {
+  const deleteCapital = async (id: string) => {
     await deleteDoc(doc(db, "hustleCapitals", id));
     if (activeCapital?.id === id) setActiveCapital(null);
   };
 
-  const startEditCapital = (c) => {
+  const startEditCapital = (c: Capital) => {
     setCapitalName(c.name);
-    setCapitalAmount(String(c.capital)); // FIX
+    setCapitalAmount(String(c.capital));
     setEditCapitalId(c.id);
   };
 
-  const selectCapital = (c) => setActiveCapital(c);
+  const selectCapital = (c: Capital) => setActiveCapital(c);
 
-  // SALES
+  /* ================= SALES ================= */
+
   const saveSale = async () => {
-    if (!activeCapital?.id || !buyer || !amount) return;
+    if (!activeCapital || !buyer || !amount) return;
 
     const list = activeCapital.sales || [];
 
-    let updated;
-
-    if (editSaleIndex !== null) {
-      updated = list.map((s, i) =>
-        i === editSaleIndex
-          ? { ...s, buyer, amount: Number(amount) }
-          : s
-      );
-    } else {
-      updated = [
-        ...list,
-        {
-          buyer,
-          amount: Number(amount),
-          date: new Date().toLocaleDateString(),
-        },
-      ];
-    }
+    const updated =
+      editSaleIndex !== null
+        ? list.map((s, i) =>
+            i === editSaleIndex
+              ? { ...s, buyer, amount: Number(amount) }
+              : s
+          )
+        : [
+            ...list,
+            {
+              buyer,
+              amount: Number(amount),
+              date: new Date().toLocaleDateString(),
+            },
+          ];
 
     await updateDoc(doc(db, "hustleCapitals", activeCapital.id), {
       sales: updated,
@@ -137,14 +163,18 @@ export default function HustlePage() {
     setEditSaleIndex(null);
   };
 
-  const editSale = (i) => {
+  const editSale = (i: number) => {
+    if (!activeCapital) return;
+
     const s = activeCapital.sales[i];
     setBuyer(s.buyer);
-    setAmount(String(s.amount)); // FIX
+    setAmount(String(s.amount));
     setEditSaleIndex(i);
   };
 
-  const deleteSale = async (i) => {
+  const deleteSale = async (i: number) => {
+    if (!activeCapital) return;
+
     const updated = activeCapital.sales.filter((_, x) => x !== i);
 
     await updateDoc(doc(db, "hustleCapitals", activeCapital.id), {
@@ -152,30 +182,28 @@ export default function HustlePage() {
     });
   };
 
-  // EXPENSES
+  /* ================= EXPENSES ================= */
+
   const saveExpense = async () => {
-    if (!activeCapital?.id || !expDesc || !expAmount) return;
+    if (!activeCapital || !expDesc || !expAmount) return;
 
     const list = activeCapital.expenses || [];
 
-    let updated;
-
-    if (editExpIndex !== null) {
-      updated = list.map((e, i) =>
-        i === editExpIndex
-          ? { ...e, desc: expDesc, amount: Number(expAmount) }
-          : e
-      );
-    } else {
-      updated = [
-        ...list,
-        {
-          desc: expDesc,
-          amount: Number(expAmount),
-          date: new Date().toLocaleDateString(),
-        },
-      ];
-    }
+    const updated =
+      editExpIndex !== null
+        ? list.map((e, i) =>
+            i === editExpIndex
+              ? { ...e, desc: expDesc, amount: Number(expAmount) }
+              : e
+          )
+        : [
+            ...list,
+            {
+              desc: expDesc,
+              amount: Number(expAmount),
+              date: new Date().toLocaleDateString(),
+            },
+          ];
 
     await updateDoc(doc(db, "hustleCapitals", activeCapital.id), {
       expenses: updated,
@@ -186,14 +214,18 @@ export default function HustlePage() {
     setEditExpIndex(null);
   };
 
-  const editExpense = (i) => {
+  const editExpense = (i: number) => {
+    if (!activeCapital) return;
+
     const e = activeCapital.expenses[i];
     setExpDesc(e.desc);
-    setExpAmount(String(e.amount)); // FIX
+    setExpAmount(String(e.amount));
     setEditExpIndex(i);
   };
 
-  const deleteExpense = async (i) => {
+  const deleteExpense = async (i: number) => {
+    if (!activeCapital) return;
+
     const updated = activeCapital.expenses.filter((_, x) => x !== i);
 
     await updateDoc(doc(db, "hustleCapitals", activeCapital.id), {
@@ -201,22 +233,22 @@ export default function HustlePage() {
     });
   };
 
-  // CALCULATIONS
+  /* ================= CALCULATIONS ================= */
+
   const totalSales =
-    activeCapital?.sales?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
+    activeCapital?.sales.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
 
   const totalExpenses =
-    activeCapital?.expenses?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
+    activeCapital?.expenses.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
 
   const net = totalSales - totalExpenses;
-
   const capital = activeCapital?.capital || 0;
 
   const profit = net >= capital ? net - capital : 0;
-
   const remaining = capital - net;
 
-  // UI
+  /* ================= UI ================= */
+
   return (
     <div className="p-4 max-w-md mx-auto grid gap-4 pb-24">
 
@@ -251,13 +283,27 @@ export default function HustlePage() {
 
           {capitals.map((c) => (
             <div key={c.id} className="flex justify-between border-b py-2">
-              <div onClick={() => selectCapital(c)} className="cursor-pointer">
+              <div
+                className="cursor-pointer"
+                onClick={() => selectCapital(c)}
+              >
                 {c.name} - {c.capital}
               </div>
 
               <div className="flex gap-2">
-                <button onClick={() => startEditCapital(c)} className="text-blue-500 text-sm">Edit</button>
-                <button onClick={() => deleteCapital(c.id)} className="text-red-500 text-sm">Delete</button>
+                <button
+                  onClick={() => startEditCapital(c)}
+                  className="text-blue-500 text-sm"
+                >
+                  Edit
+                </button>
+
+                <button
+                  onClick={() => deleteCapital(c.id)}
+                  className="text-red-500 text-sm"
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}
@@ -276,7 +322,9 @@ export default function HustlePage() {
               <p>Expenses: {totalExpenses}</p>
 
               <p className="font-bold">
-                {net >= capital ? `Profit: ${profit}` : `Remaining: ${remaining}`}
+                {net >= capital
+                  ? `Profit: ${profit}`
+                  : `Remaining: ${remaining}`}
               </p>
             </CardContent>
           </Card>
@@ -305,28 +353,6 @@ export default function HustlePage() {
             </CardContent>
           </Card>
 
-          {/* SALES HISTORY */}
-          <Card>
-            <CardContent className="p-4">
-              <h2 className="font-bold">Sales History</h2>
-
-              {(activeCapital.sales || []).length === 0 ? (
-                <p>No sales yet</p>
-              ) : (
-                activeCapital.sales.map((s, i) => (
-                  <div key={i} className="flex justify-between border-b py-1">
-                    <span>{s.buyer} ({s.date}) - {s.amount}</span>
-
-                    <div className="flex gap-2">
-                      <button onClick={() => editSale(i)} className="text-blue-500 text-sm">Edit</button>
-                      <button onClick={() => deleteSale(i)} className="text-red-500 text-sm">Delete</button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
           {/* EXPENSES */}
           <Card>
             <CardContent className="p-4">
@@ -348,28 +374,6 @@ export default function HustlePage() {
               <Button onClick={saveExpense} className="mt-2 w-full">
                 {editExpIndex !== null ? "Update Expense" : "Add Expense"}
               </Button>
-            </CardContent>
-          </Card>
-
-          {/* EXPENSE HISTORY */}
-          <Card>
-            <CardContent className="p-4">
-              <h2 className="font-bold">Expense History</h2>
-
-              {(activeCapital.expenses || []).length === 0 ? (
-                <p>No expenses yet</p>
-              ) : (
-                activeCapital.expenses.map((e, i) => (
-                  <div key={i} className="flex justify-between border-b py-1">
-                    <span>{e.desc} ({e.date}) - {e.amount}</span>
-
-                    <div className="flex gap-2">
-                      <button onClick={() => editExpense(i)} className="text-blue-500 text-sm">Edit</button>
-                      <button onClick={() => deleteExpense(i)} className="text-red-500 text-sm">Delete</button>
-                    </div>
-                  </div>
-                ))
-              )}
             </CardContent>
           </Card>
         </>
