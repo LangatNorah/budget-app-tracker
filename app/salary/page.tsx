@@ -25,10 +25,10 @@ export default function SalaryApp() {
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
 
-  const [monthsData, setMonthsData] = useState([]);
-  const [activeMonth, setActiveMonth] = useState(null);
+  const [monthsData, setMonthsData] = useState<any[]>([]);
+  const [activeMonth, setActiveMonth] = useState<any | null>(null);
 
-  const [editId, setEditId] = useState(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   // LOAD MONTHS
   useEffect(() => {
@@ -67,7 +67,10 @@ export default function SalaryApp() {
   // SAVE OR UPDATE MONTH
   const saveMonth = async () => {
     try {
-      if (!month || !salary) return alert("Fill all fields");
+      if (!month || !salary) {
+        alert("Fill all fields");
+        return;
+      }
 
       if (editId) {
         await updateDoc(doc(db, "months", editId), {
@@ -93,7 +96,7 @@ export default function SalaryApp() {
   };
 
   // DELETE MONTH
-  const deleteMonth = async (id) => {
+  const deleteMonth = async (id: string) => {
     try {
       await deleteDoc(doc(db, "months", id));
 
@@ -106,7 +109,7 @@ export default function SalaryApp() {
   };
 
   // SELECT MONTH
-  const selectMonth = (m) => {
+  const selectMonth = (m: any) => {
     setActiveMonth({
       ...m,
       expenses: m.expenses || [],
@@ -114,7 +117,7 @@ export default function SalaryApp() {
   };
 
   // START EDIT MONTH
-  const startEditMonth = (m) => {
+  const startEditMonth = (m: any) => {
     setEditId(m.id);
     setMonth(m.month);
     setSalary(m.salary);
@@ -123,8 +126,15 @@ export default function SalaryApp() {
   // ADD EXPENSE
   const addExpense = async () => {
     try {
-      if (!desc || !amount) return alert("Fill expense fields");
-      if (!activeMonth?.id) return alert("Select month first");
+      if (!desc || !amount) {
+        alert("Fill expense fields");
+        return;
+      }
+
+      if (!activeMonth?.id) {
+        alert("Select month first");
+        return;
+      }
 
       const ref = doc(db, "months", activeMonth.id);
 
@@ -148,16 +158,18 @@ export default function SalaryApp() {
     }
   };
 
-  // EDIT EXPENSE
-  const editExpense = async (index) => {
-    const item = activeMonth.expenses[index];
+  // EDIT EXPENSE (FIXED SAFETY)
+  const editExpense = async (index: number) => {
+    if (!activeMonth) return;
+
+    const item = activeMonth.expenses?.[index];
     if (!item) return;
 
     setDesc(item.desc);
     setAmount(item.amount);
 
     const updated = activeMonth.expenses.filter(
-      (_, i) => i !== index
+      (_: any, i: number) => i !== index
     );
 
     await updateDoc(doc(db, "months", activeMonth.id), {
@@ -165,30 +177,27 @@ export default function SalaryApp() {
     });
   };
 
-  // DELETE EXPENSE
-  const deleteExpense = async (index) => {
-    try {
-      const updated = activeMonth.expenses.filter(
-        (_, i) => i !== index
-      );
+  // DELETE EXPENSE (FIXED SAFETY)
+  const deleteExpense = async (index: number) => {
+    if (!activeMonth) return;
 
-      await updateDoc(doc(db, "months", activeMonth.id), {
-        expenses: updated,
-      });
-    } catch (err) {
-      console.error(err);
-    }
+    const updated = activeMonth.expenses.filter(
+      (_: any, i: number) => i !== index
+    );
+
+    await updateDoc(doc(db, "months", activeMonth.id), {
+      expenses: updated,
+    });
   };
 
   // CALCULATIONS
   const totalExpenses =
     activeMonth?.expenses?.reduce(
-      (sum, e) => sum + Number(e.amount || 0),
+      (sum: number, e: any) => sum + Number(e.amount || 0),
       0
     ) || 0;
 
-  const balance =
-    (activeMonth?.salary || 0) - totalExpenses;
+  const balance = (activeMonth?.salary || 0) - totalExpenses;
 
   return (
     <div className="p-4 max-w-md mx-auto grid gap-4 pb-24">
@@ -301,16 +310,14 @@ export default function SalaryApp() {
               {(activeMonth.expenses || []).length === 0 ? (
                 <p>No expenses yet</p>
               ) : (
-                activeMonth.expenses.map((e, i) => (
+                activeMonth.expenses.map((e: any, i: number) => (
                   <div
                     key={i}
                     className="flex justify-between border-b py-1"
                   >
                     <div>
                       <p>{e.desc}</p>
-                      <p className="text-xs text-gray-500">
-                        {e.date}
-                      </p>
+                      <p className="text-xs text-gray-500">{e.date}</p>
                     </div>
 
                     <div className="flex gap-2 items-center">
