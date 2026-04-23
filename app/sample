@@ -1,0 +1,307 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
+
+import { db } from "@/lib/firebase";
+
+export default function BudgetApp() {
+  // ================= STATE =================
+  const [salary, setSalary] = useState("");
+  const [capital, setCapital] = useState("");
+
+  const [expenses, setExpenses] = useState([]);
+  const [hustles, setHustles] = useState([]);
+
+  const [desc, setDesc] = useState("");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("Food");
+
+  const [hustleIncome, setHustleIncome] = useState("");
+  const [hustleBuyer, setHustleBuyer] = useState("");
+
+  const [editExpenseId, setEditExpenseId] = useState(null);
+  const [editHustleId, setEditHustleId] = useState(null);
+
+  // ================= FIREBASE LOAD =================
+  useEffect(() => {
+    const unsubExpenses = onSnapshot(collection(db, "expenses"), (snap) => {
+      setExpenses(
+        snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      );
+    });
+
+    const unsubHustles = onSnapshot(collection(db, "hustles"), (snap) => {
+      setHustles(
+        snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      );
+    });
+
+    return () => {
+      unsubExpenses();
+      unsubHustles();
+    };
+  }, []);
+
+  // ================= ADD EXPENSE =================
+  const addExpense = async () => {
+    if (!desc || !amount) return;
+
+    await addDoc(collection(db, "expenses"), {
+      desc,
+      amount: Number(amount),
+      category,
+      date: new Date().toLocaleDateString(),
+    });
+
+    setDesc("");
+    setAmount("");
+    setCategory("Food");
+  };
+
+  // ================= EDIT EXPENSE =================
+  const editExpense = async (id) => {
+    const ref = doc(db, "expenses", id);
+
+    await updateDoc(ref, {
+      desc,
+      amount: Number(amount),
+      category,
+    });
+
+    setDesc("");
+    setAmount("");
+    setCategory("Food");
+    setEditExpenseId(null);
+  };
+
+  // ================= ADD HUSTLE =================
+  const addHustle = async () => {
+    if (!hustleIncome) return;
+
+    await addDoc(collection(db, "hustles"), {
+      buyer: hustleBuyer || "Unknown",
+      amount: Number(hustleIncome),
+      date: new Date().toLocaleDateString(),
+    });
+
+    setHustleIncome("");
+    setHustleBuyer("");
+  };
+
+  // ================= EDIT HUSTLE =================
+  const editHustle = async (id) => {
+    const ref = doc(db, "hustles", id);
+
+    await updateDoc(ref, {
+      buyer: hustleBuyer,
+      amount: Number(hustleIncome),
+    });
+
+    setHustleIncome("");
+    setHustleBuyer("");
+    setEditHustleId(null);
+  };
+
+  // ================= CALCULATIONS =================
+  const totalExpenses = expenses.reduce(
+    (sum, e) => sum + e.amount,
+    0
+  );
+
+  const totalHustle = hustles.reduce(
+    (sum, h) => sum + h.amount,
+    0
+  );
+
+  const salaryBalance = (Number(salary) || 0) - totalExpenses;
+
+  const hustleProfit = capital
+    ? Math.max(totalHustle - Number(capital), 0)
+    : totalHustle;
+
+  const grandTotal = totalExpenses + hustleProfit;
+
+  // ================= UI =================
+  return (
+    <div className="p-4 grid gap-4 max-w-md mx-auto">
+
+      {/* SALARY */}
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="font-bold text-xl">Salary</h2>
+          <Input
+            type="number"
+            value={salary}
+            onChange={(e) => setSalary(e.target.value)}
+            placeholder="Enter salary"
+          />
+        </CardContent>
+      </Card>
+
+      {/* HUSTLE CAPITAL */}
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="font-bold text-xl">Hustle Capital</h2>
+          <Input
+            type="number"
+            value={capital}
+            onChange={(e) => setCapital(e.target.value)}
+            placeholder="Enter capital"
+          />
+        </CardContent>
+      </Card>
+
+      {/* ADD HUSTLE */}
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="font-bold text-xl">Add Hustle</h2>
+
+          <Input
+            placeholder="Buyer"
+            value={hustleBuyer}
+            onChange={(e) => setHustleBuyer(e.target.value)}
+          />
+
+          <Input
+            type="number"
+            placeholder="Amount"
+            value={hustleIncome}
+            onChange={(e) => setHustleIncome(e.target.value)}
+          />
+
+          <Button
+            onClick={() =>
+              editHustleId ? editHustle(editHustleId) : addHustle()
+            }
+            className="w-full mt-2"
+          >
+            {editHustleId ? "Save Edit" : "Save Hustle"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ADD EXPENSE */}
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="font-bold text-xl">Add Expense</h2>
+
+          <Input
+            placeholder="Description"
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+          />
+
+          <Input
+            type="number"
+            placeholder="Amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full p-2 border rounded mt-2"
+          >
+            <option>Food</option>
+            <option>Transport</option>
+            <option>Fees</option>
+            <option>Airtime</option>
+            <option>Other</option>
+          </select>
+
+          <Button
+            onClick={() =>
+              editExpenseId ? editExpense(editExpenseId) : addExpense()
+            }
+            className="w-full mt-2"
+          >
+            {editExpenseId ? "Save Edit" : "Save Expense"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* SUMMARY */}
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="font-bold text-xl">Summary</h2>
+
+          <p>Salary: {salary || 0}</p>
+          <p>Salary Balance: {salaryBalance}</p>
+          <p>Total Expenses: {totalExpenses}</p>
+          <p>Hustle Profit: {hustleProfit}</p>
+          <p className="font-bold">Grand Total: {grandTotal}</p>
+        </CardContent>
+      </Card>
+
+      {/* HUSTLE HISTORY */}
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="font-bold text-xl">Hustle History</h2>
+
+          {hustles.map((h) => (
+            <div key={h.id} className="flex justify-between border-b py-1">
+              <span>{h.date} - {h.buyer}</span>
+
+              <div className="flex gap-2">
+                <span>{h.amount}</span>
+
+                <button
+                  onClick={() => {
+                    setHustleBuyer(h.buyer);
+                    setHustleIncome(h.amount);
+                    setEditHustleId(h.id);
+                  }}
+                  className="text-blue-500"
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* EXPENSE HISTORY */}
+      <Card>
+        <CardContent className="p-4">
+          <h2 className="font-bold text-xl">Expense History</h2>
+
+          {expenses.map((e) => (
+            <div key={e.id} className="flex justify-between border-b py-1">
+              <span>{e.desc} ({e.category})</span>
+
+              <div className="flex gap-2">
+                <span>{e.amount}</span>
+
+                <button
+                  onClick={() => {
+                    setDesc(e.desc);
+                    setAmount(e.amount);
+                    setCategory(e.category);
+                    setEditExpenseId(e.id);
+                  }}
+                  className="text-blue-500"
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+    </div>
+  );
+}
