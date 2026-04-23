@@ -3,13 +3,9 @@
 import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   const path = usePathname();
 
   const hideNav = path === "/login";
@@ -27,18 +23,15 @@ export default function RootLayout({
         {!hideNav && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around py-3 shadow-md">
             <Link href="/" className={tabStyle("/")}>
-              🏠
-              <div>Home</div>
+              🏠<div>Home</div>
             </Link>
 
             <Link href="/salary" className={tabStyle("/salary")}>
-              💰
-              <div>Salary</div>
+              💰<div>Salary</div>
             </Link>
 
             <Link href="/hustle" className={tabStyle("/hustle")}>
-              💼
-              <div>Hustle</div>
+              💼<div>Hustle</div>
             </Link>
           </div>
         )}
