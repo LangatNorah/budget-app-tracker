@@ -38,7 +38,7 @@ export default function HustlePage() {
   const [capitals, setCapitals] = useState([]);
   const [activeCapital, setActiveCapital] = useState(null);
 
-  // ================= LOAD DATA =================
+  // LOAD DATA
   useEffect(() => {
     const q = query(
       collection(db, "hustleCapitals"),
@@ -64,9 +64,9 @@ export default function HustlePage() {
 
     const updated = capitals.find((c) => c.id === activeCapital.id);
     if (updated) setActiveCapital(updated);
-  }, [capitals]);
+  }, [capitals, activeCapital?.id]);
 
-  // ================= CAPITAL =================
+  // CAPITAL
   const saveCapital = async () => {
     if (!capitalName || !capitalAmount) return;
 
@@ -97,13 +97,13 @@ export default function HustlePage() {
 
   const startEditCapital = (c) => {
     setCapitalName(c.name);
-    setCapitalAmount(c.capital);
+    setCapitalAmount(String(c.capital)); // FIX
     setEditCapitalId(c.id);
   };
 
   const selectCapital = (c) => setActiveCapital(c);
 
-  // ================= SALES =================
+  // SALES
   const saveSale = async () => {
     if (!activeCapital?.id || !buyer || !amount) return;
 
@@ -140,7 +140,7 @@ export default function HustlePage() {
   const editSale = (i) => {
     const s = activeCapital.sales[i];
     setBuyer(s.buyer);
-    setAmount(s.amount);
+    setAmount(String(s.amount)); // FIX
     setEditSaleIndex(i);
   };
 
@@ -152,7 +152,7 @@ export default function HustlePage() {
     });
   };
 
-  // ================= EXPENSES =================
+  // EXPENSES
   const saveExpense = async () => {
     if (!activeCapital?.id || !expDesc || !expAmount) return;
 
@@ -189,7 +189,7 @@ export default function HustlePage() {
   const editExpense = (i) => {
     const e = activeCapital.expenses[i];
     setExpDesc(e.desc);
-    setExpAmount(e.amount);
+    setExpAmount(String(e.amount)); // FIX
     setEditExpIndex(i);
   };
 
@@ -201,7 +201,7 @@ export default function HustlePage() {
     });
   };
 
-  // ================= CALCULATIONS =================
+  // CALCULATIONS
   const totalSales =
     activeCapital?.sales?.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
 
@@ -216,7 +216,7 @@ export default function HustlePage() {
 
   const remaining = capital - net;
 
-  // ================= UI =================
+  // UI
   return (
     <div className="p-4 max-w-md mx-auto grid gap-4 pb-24">
 
@@ -267,7 +267,6 @@ export default function HustlePage() {
       {/* ACTIVE CAPITAL */}
       {activeCapital && (
         <>
-          {/* SUMMARY */}
           <Card>
             <CardContent className="p-4">
               <h2 className="font-bold">{activeCapital.name}</h2>
@@ -282,7 +281,7 @@ export default function HustlePage() {
             </CardContent>
           </Card>
 
-          {/* SALES INPUT */}
+          {/* SALES */}
           <Card>
             <CardContent className="p-4">
               <h2 className="font-bold">Add Sale</h2>
@@ -306,12 +305,12 @@ export default function HustlePage() {
             </CardContent>
           </Card>
 
-          {/* SALES HISTORY CARD */}
+          {/* SALES HISTORY */}
           <Card>
             <CardContent className="p-4">
               <h2 className="font-bold">Sales History</h2>
 
-              {activeCapital.sales.length === 0 ? (
+              {(activeCapital.sales || []).length === 0 ? (
                 <p>No sales yet</p>
               ) : (
                 activeCapital.sales.map((s, i) => (
@@ -328,7 +327,7 @@ export default function HustlePage() {
             </CardContent>
           </Card>
 
-          {/* EXPENSE INPUT */}
+          {/* EXPENSES */}
           <Card>
             <CardContent className="p-4">
               <h2 className="font-bold">Add Expense</h2>
@@ -352,12 +351,12 @@ export default function HustlePage() {
             </CardContent>
           </Card>
 
-          {/* EXPENSE HISTORY CARD */}
+          {/* EXPENSE HISTORY */}
           <Card>
             <CardContent className="p-4">
               <h2 className="font-bold">Expense History</h2>
 
-              {activeCapital.expenses.length === 0 ? (
+              {(activeCapital.expenses || []).length === 0 ? (
                 <p>No expenses yet</p>
               ) : (
                 activeCapital.expenses.map((e, i) => (
