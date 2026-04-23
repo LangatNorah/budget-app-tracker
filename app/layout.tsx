@@ -3,31 +3,29 @@
 import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ReactNode } from "react";
 
-
-export default function RootLayout({ children }) {
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const path = usePathname();
 
   const hideNav = path === "/login";
 
-  const tabStyle = (route) =>
+  const tabStyle = (route: string) =>
     `text-center text-sm ${
       path === route ? "text-blue-600 font-bold" : "text-gray-500"
     }`;
 
   return (
     <html lang="en">
-
-   
-
       <body className="bg-gray-100">
-
         <div className="pb-24">{children}</div>
 
-        {/* 🚫 HIDE NAV ON LOGIN PAGE */}
         {!hideNav && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around py-3 shadow-md">
-
             <Link href="/" className={tabStyle("/")}>
               🏠
               <div>Home</div>
@@ -42,10 +40,8 @@ export default function RootLayout({ children }) {
               💼
               <div>Hustle</div>
             </Link>
-
           </div>
         )}
-
       </body>
     </html>
   );
