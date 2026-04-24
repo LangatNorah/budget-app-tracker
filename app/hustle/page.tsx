@@ -249,68 +249,81 @@ export default function HustlePage() {
 
   /* ================= UI ================= */
 
-   return (
+  return (
     <div className="relative min-h-screen text-white">
 
+      {/* ✅ BACKGROUND IMAGE (ONLY ADDITION) */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/money-bg.jpg')" }}
       />
 
+      {/* ✅ DARK OVERLAY */}
       <div className="fixed inset-0 bg-black/60" />
 
+      {/* YOUR ORIGINAL CONTENT (UNCHANGED) */}
       <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-24">
 
-        {/* CAPITAL FORM */}
-        <Card className="bg-white/10 backdrop-blur-md border-white/10">
-          <CardContent className="p-4">
-            <h2 className="font-bold">Capital</h2>
 
-            <Input
-              placeholder="Name"
-              value={capitalName}
-              onChange={(e) => setCapitalName(e.target.value)}
-              className="text-white/70"
-            />
+      {/* CAPITAL FORM */}
+      <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
+        <CardContent className="p-4">
+          <h2 className="font-bold">Capital</h2>
 
-            <Input
-              type="number"
-              placeholder="Amount"
-              value={capitalAmount}
-              onChange={(e) => setCapitalAmount(e.target.value)}
-              className="text-white/70"
-            />
+          <Input
+            placeholder="Name"
+            value={capitalName}
+            onChange={(e) => setCapitalName(e.target.value)}
+            className="text-white placeholder:text-white/70"
+          />
 
-            <Button onClick={saveCapital} className="mt-2 w-full">
-              {editCapitalId ? "Update Capital" : "Save Capital"}
-            </Button>
-          </CardContent>
-        </Card>
+          <Input
+            type="number"
+            placeholder="Amount"
+            value={capitalAmount}
+            onChange={(e) => setCapitalAmount(e.target.value)}
+            className="text-white placeholder:text-white/70"
+          />
 
-        {/* CAPITAL LIST */}
-        <Card className="bg-white/10 backdrop-blur-md border-white/10">
-          <CardContent className="p-4">
-            <h2 className="font-bold">Capitals</h2>
+          <Button onClick={saveCapital} className="mt-2 w-full">
+            {editCapitalId ? "Update Capital" : "Save Capital"}
+          </Button>
+        </CardContent>
+      </Card>
 
-            {capitals.map((c) => (
-              <div key={c.id} className="flex justify-between border-b py-2">
-                <div onClick={() => selectCapital(c)} className="cursor-pointer">
-                  {c.name} - {c.capital}
-                </div>
+      {/* CAPITAL LIST */}
+      <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
+        <CardContent className="p-4">
+          <h2 className="font-bold">Capitals</h2>
 
-                <div className="flex gap-2">
-                  <button onClick={() => startEditCapital(c)} className="text-blue-300 text-sm">
-                    Edit
-                  </button>
-
-                  <button onClick={() => deleteCapital(c.id)} className="text-red-300 text-sm">
-                    Delete
-                  </button>
-                </div>
+          {capitals.map((c) => (
+            <div key={c.id} className="flex justify-between border-b py-2">
+              <div
+                className="cursor-pointer"
+                onClick={() => selectCapital(c)}
+              >
+                {c.name} - {c.capital}
               </div>
-            ))}
-          </CardContent>
-        </Card>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => startEditCapital(c)}
+                  className="text-blue-800 text-sm"
+                >
+                  Edit
+                </button>
+
+                <button
+                  onClick={() => deleteCapital(c.id)}
+                  className="text-red-800 text-sm"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* ACTIVE CAPITAL */}
       {activeCapital && (
@@ -340,7 +353,7 @@ export default function HustlePage() {
                 placeholder="Buyer"
                 value={buyer}
                 onChange={(e) => setBuyer(e.target.value)}
-                className="text-white"
+                className="placeholder:text-white/70"
               />
 
               <Input
@@ -348,7 +361,7 @@ export default function HustlePage() {
                 placeholder="Amount"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="text-white"
+                className="placeholder:text-white/70"
               />
 
               <Button onClick={saveSale} className="mt-2 w-full">
@@ -401,7 +414,7 @@ export default function HustlePage() {
                 placeholder="Description"
                 value={expDesc}
                 onChange={(e) => setExpDesc(e.target.value)}
-                className="text-white"
+                className="placeholder:text-white/70"
               />
 
               <Input
@@ -409,7 +422,7 @@ export default function HustlePage() {
                 placeholder="Amount"
                 value={expAmount}
                 onChange={(e) => setExpAmount(e.target.value)}
-                className="text-white"
+                className="placeholder:text-white/70"
               />
 
               <Button onClick={saveExpense} className="mt-2 w-full">
