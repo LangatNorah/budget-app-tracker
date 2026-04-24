@@ -250,10 +250,23 @@ export default function HustlePage() {
   /* ================= UI ================= */
 
   return (
-    <div className="p-4 max-w-md mx-auto grid gap-4 pb-24">
+    <div className="relative min-h-screen text-white">
+
+      {/* ✅ BACKGROUND IMAGE (ONLY ADDITION) */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/money-bg.jpg')" }}
+      />
+
+      {/* ✅ DARK OVERLAY */}
+      <div className="fixed inset-0 bg-black/60" />
+
+      {/* YOUR ORIGINAL CONTENT (UNCHANGED) */}
+      <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-24">
+
 
       {/* CAPITAL FORM */}
-      <Card>
+      <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
         <CardContent className="p-4">
           <h2 className="font-bold">Capital</h2>
 
@@ -277,7 +290,7 @@ export default function HustlePage() {
       </Card>
 
       {/* CAPITAL LIST */}
-      <Card>
+      <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
         <CardContent className="p-4">
           <h2 className="font-bold">Capitals</h2>
 
@@ -293,14 +306,14 @@ export default function HustlePage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => startEditCapital(c)}
-                  className="text-blue-500 text-sm"
+                  className="text-blue-800 text-sm"
                 >
                   Edit
                 </button>
 
                 <button
                   onClick={() => deleteCapital(c.id)}
-                  className="text-red-500 text-sm"
+                  className="text-red-800 text-sm"
                 >
                   Delete
                 </button>
@@ -313,7 +326,7 @@ export default function HustlePage() {
       {/* ACTIVE CAPITAL */}
       {activeCapital && (
         <>
-          <Card>
+          <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
             <CardContent className="p-4">
               <h2 className="font-bold">{activeCapital.name}</h2>
 
@@ -330,7 +343,7 @@ export default function HustlePage() {
           </Card>
 
           {/* SALES */}
-          <Card>
+          <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
             <CardContent className="p-4">
               <h2 className="font-bold">Add Sale</h2>
 
@@ -354,7 +367,7 @@ export default function HustlePage() {
           </Card>
 
           {/* SALES HISTORY */}
-<Card>
+<Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
   <CardContent className="p-4">
     <h2 className="font-bold">Sales History</h2>
 
@@ -370,14 +383,14 @@ export default function HustlePage() {
           <div className="flex gap-2">
             <button
               onClick={() => editSale(i)}
-              className="text-blue-500 text-sm"
+              className="text-blue-800 text-sm"
             >
               Edit
             </button>
 
             <button
               onClick={() => deleteSale(i)}
-              className="text-red-500 text-sm"
+              className="text-red-800 text-sm"
             >
               Delete
             </button>
@@ -389,7 +402,7 @@ export default function HustlePage() {
 </Card>
 
           {/* EXPENSES */}
-          <Card>
+          <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
             <CardContent className="p-4">
               <h2 className="font-bold">Add Expense</h2>
 
@@ -413,7 +426,7 @@ export default function HustlePage() {
           </Card>
 
           {/* EXPENSE HISTORY */}
-<Card>
+<Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
   <CardContent className="p-4">
     <h2 className="font-bold">Expense History</h2>
 
@@ -429,14 +442,14 @@ export default function HustlePage() {
           <div className="flex gap-2">
             <button
               onClick={() => editExpense(i)}
-              className="text-blue-500 text-sm"
+              className="text-blue-800 text-sm"
             >
               Edit
             </button>
 
             <button
               onClick={() => deleteExpense(i)}
-              className="text-red-500 text-sm"
+              className="text-red-800 text-sm"
             >
               Delete
             </button>
@@ -448,6 +461,7 @@ export default function HustlePage() {
 </Card>
         </>
       )}
+    </div>
     </div>
   );
 }

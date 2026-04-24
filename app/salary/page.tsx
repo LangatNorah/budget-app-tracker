@@ -41,7 +41,7 @@ export default function SalaryApp() {
       const data = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
-        expenses: d.data().expenses || [],
+        expenses: (d.data() as any).expenses || [],
       }));
 
       setMonthsData(data);
@@ -158,7 +158,6 @@ export default function SalaryApp() {
     }
   };
 
-  // EDIT EXPENSE (FIXED SAFETY)
   const editExpense = async (index: number) => {
     if (!activeMonth) return;
 
@@ -177,7 +176,6 @@ export default function SalaryApp() {
     });
   };
 
-  // DELETE EXPENSE (FIXED SAFETY)
   const deleteExpense = async (index: number) => {
     if (!activeMonth) return;
 
@@ -190,7 +188,6 @@ export default function SalaryApp() {
     });
   };
 
-  // CALCULATIONS
   const totalExpenses =
     activeMonth?.expenses?.reduce(
       (sum: number, e: any) => sum + Number(e.amount || 0),
@@ -200,150 +197,152 @@ export default function SalaryApp() {
   const balance = (activeMonth?.salary || 0) - totalExpenses;
 
   return (
-    <div className="p-4 max-w-md mx-auto grid gap-4 pb-24">
+     <div className="relative min-h-screen text-white overflow-x-hidden">
 
-      {/* MONTH FORM */}
-      <Card>
-        <CardContent className="p-4">
-          <h2 className="font-bold">
-            {editId ? "Edit Month" : "Create Month"}
-          </h2>
+    {/* BACKGROUND */}
+    <div
+      className="fixed inset-0 bg-cover bg-center -z-20"
+      style={{ backgroundImage: "url('/money-bg.jpg')" }}
+    />
 
-          <Input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-          />
+    {/* OVERLAY */}
+    <div className="fixed inset-0 bg-black/60 -z-10 pointer-events-none" />
 
-          <Input
-            type="number"
-            placeholder="Salary"
-            value={salary}
-            onChange={(e) => setSalary(e.target.value)}
-          />
+    {/* CONTENT */}
+    <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-40">
 
-          <Button onClick={saveMonth} className="mt-2 w-full">
-            {editId ? "Update Month" : "Save Month"}
-          </Button>
-        </CardContent>
-      </Card>
+        {/* MONTH FORM */}
+        <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
+          <CardContent className="p-4">
+            <h2 className="font-bold">
+              {editId ? "Edit Month" : "Create Month"}
+            </h2>
 
-      {/* MONTH LIST */}
-      <Card>
-        <CardContent className="p-4">
-          <h2 className="font-bold">Months</h2>
+            <Input className="text-white"
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
 
-          {monthsData.map((m) => (
-            <div
-              key={m.id}
-              className="flex justify-between border-b py-2"
-            >
+            <Input className="text-white"
+              type="number"
+              placeholder="Salary" 
+              value={salary}
+              onChange={(e) => setSalary(e.target.value)}
+            />
+
+            <Button onClick={saveMonth} className="mt-2 w-full">
+              {editId ? "Update Month" : "Save Month"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* MONTH LIST */}
+        <Card className="bg-white/10  backdrop-blur-md text-black border-white/10">
+          <CardContent className="p-4">
+            <h2 className="font-bold">Months</h2>
+
+            {monthsData.map((m) => (
               <div
-                onClick={() => selectMonth(m)}
-                className="cursor-pointer"
+                key={m.id}
+                className="flex justify-between border-b border-white/10 py-2"
               >
-                {m.month} - {m.salary}
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => startEditMonth(m)}
-                  className="text-blue-500 text-sm"
+                <div
+                  onClick={() => selectMonth(m)}
+                  className="cursor-pointer"
                 >
-                  Edit
-                </button>
+                  {m.month} - {m.salary}
+                </div>
 
-                <button
-                  onClick={() => deleteMonth(m.id)}
-                  className="text-red-500 text-sm"
-                >
-                  Delete
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={() => startEditMonth(m)} className="text-blue-800 text-sm">
+                    Edit
+                  </button>
+
+                  <button onClick={() => deleteMonth(m.id)} className="text-red-800 text-sm">
+                    Delete
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
 
-      {/* ACTIVE MONTH */}
-      {activeMonth && (
-        <>
-          <Card>
-            <CardContent className="p-4">
-              <h2 className="font-bold">{activeMonth.month}</h2>
+        {/* ACTIVE MONTH */}
+        {activeMonth && (
+          <>
+            <Card className="bg-white  backdrop-blur-md text-black border-white/10">
+              <CardContent className="p-4">
+                <h2 className="font-bold">{activeMonth.month}</h2>
 
-              <p>Salary: {activeMonth.salary}</p>
-              <p>Total Expenses: {totalExpenses}</p>
-              <p className="font-bold">Balance: {balance}</p>
-            </CardContent>
-          </Card>
+                <p>Salary: {activeMonth.salary}</p>
+                <p>Total Expenses: {totalExpenses}</p>
+                <p className="font-bold">Balance: {balance}</p>
+              </CardContent>
+            </Card>
 
-          {/* EXPENSE FORM */}
-          <Card>
-            <CardContent className="p-4">
-              <h2 className="font-bold">Add Expense</h2>
+            {/* EXPENSE FORM */}
+            <Card className="bg-white backdrop-blur-md text-black border-white/10">
+              <CardContent className="p-4">
+                <h2 className="font-bold">Add Expense</h2>
 
-              <Input
-                placeholder="Description"
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-              />
+                <Input
+                
+                  placeholder="Description"
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                />
 
-              <Input
-                type="number"
-                placeholder="Amount"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
+                <Input
+                  type="number"
+                  placeholder="Amount"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
 
-              <Button onClick={addExpense} className="mt-2 w-full">
-                Add Expense
-              </Button>
-            </CardContent>
-          </Card>
+                <Button onClick={addExpense} className="mt-2 w-full">
+                  Add Expense
+                </Button>
+              </CardContent>
+            </Card>
 
-          {/* HISTORY */}
-          <Card>
-            <CardContent className="p-4">
-              <h2 className="font-bold">Expense History</h2>
+            {/* HISTORY */}
+            <Card className="bg-white backdrop-blur-md text-black border-white/10">
+              <CardContent className="p-4">
+                <h2 className="font-bold">Expense History</h2>
 
-              {(activeMonth.expenses || []).length === 0 ? (
-                <p>No expenses yet</p>
-              ) : (
-                activeMonth.expenses.map((e: any, i: number) => (
-                  <div
-                    key={i}
-                    className="flex justify-between border-b py-1"
-                  >
-                    <div>
-                      <p>{e.desc}</p>
-                      <p className="text-xs text-gray-500">{e.date}</p>
+                {(activeMonth.expenses || []).length === 0 ? (
+                  <p>No expenses yet</p>
+                ) : (
+                  activeMonth.expenses.map((e: any, i: number) => (
+                    <div
+                      key={i}
+                      className="flex justify-between border-b border-white/10 py-1"
+                    >
+                      <div>
+                        <p>{e.desc}</p>
+                        <p className="text-xs opacity-70">{e.date}</p>
+                      </div>
+
+                      <div className="flex gap-2 items-center">
+                        <span>{e.amount}</span>
+
+                        <button onClick={() => editExpense(i)} className="text-blue-800 text-sm">
+                          Edit
+                        </button>
+
+                        <button onClick={() => deleteExpense(i)} className="text-red-800 text-sm">
+                          Delete
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="flex gap-2 items-center">
-                      <span>{e.amount}</span>
-
-                      <button
-                        onClick={() => editExpense(i)}
-                        className="text-blue-500 text-sm"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        onClick={() => deleteExpense(i)}
-                        className="text-red-500 text-sm"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
     </div>
   );
 }

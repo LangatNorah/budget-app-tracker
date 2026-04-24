@@ -16,8 +16,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     }`;
 
   return (
+    
     <html lang="en">
-      <body className="bg-gray-100">
+      <body className="bg-green-900">
         <div className="pb-24">{children}</div>
 
         {!hideNav && (

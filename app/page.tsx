@@ -92,7 +92,6 @@ export default function Home() {
     );
   }, 0);
 
-  // ✅ FIXED: now uses capital correctly
   const hustle = hustles.reduce(
     (sum, h) => sum + Number(h.capital || 0),
     0
@@ -105,43 +104,56 @@ export default function Home() {
   if (!user) return null;
 
   return (
-    <div className="p-4 max-w-md mx-auto pb-24">
-      <h1 className="text-xl font-bold mb-4">📊 Dashboard</h1>
+    <div
+      className="min-h-screen bg-no-repeat bg-cover bg-center bg-fixed relative text-white"
+      style={{
+        backgroundImage: "url('/money-bg.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      {/* overlay */}
+      <div className="absolute inset-0 bg-black/60" />
 
-      <div className="grid gap-3">
-        <div className="bg-white p-4 rounded-xl shadow">
-          💰 Salary
-          <h2 className="font-bold text-xl">{salary}</h2>
-        </div>
+      {/* content */}
+      <div className="relative z-10 p-4 max-w-md mx-auto pb-24">
+        <h1 className="text-xl font-bold mb-4">📊 Dashboard</h1>
 
-        <div className="bg-white p-4 rounded-xl shadow">
-          💼 Hustle
-          <h2 className="font-bold text-xl">{hustle}</h2>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow">
-          💸 Expenses
-          <h2 className="font-bold text-xl">{expenses}</h2>
-        </div>
-
-        <div className="bg-green-100 p-4 rounded-xl shadow">
-          💵 Balance
-          <h2 className="font-bold text-xl">{balance}</h2>
-        </div>
-      </div>
-
-      <div className="mt-6 grid gap-3">
-        <Link href="/salary">
-          <div className="bg-white p-4 rounded-xl shadow cursor-pointer">
-            💰 Go to Salary Tracker
+        <div className="grid gap-3">
+          <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl shadow">
+            💰 Salary
+            <h2 className="font-bold text-xl">{salary}</h2>
           </div>
-        </Link>
 
-        <Link href="/hustle">
-          <div className="bg-white p-4 rounded-xl shadow cursor-pointer">
-            💼 Go to Hustle Tracker
+          <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl shadow">
+            💼 Hustle
+            <h2 className="font-bold text-xl">{hustle}</h2>
           </div>
-        </Link>
+
+          <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl shadow">
+            💸 Expenses
+            <h2 className="font-bold text-xl">{expenses}</h2>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl shadow">
+            💵 Balance
+            <h2 className="font-bold text-xl">{balance}</h2>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-3">
+          <Link href="/salary">
+            <div className="bg-green-500/20 backdrop-blur-md p-4 rounded-xl shadow">
+              💰 Go to Salary Tracker
+            </div>
+          </Link>
+
+          <Link href="/hustle">
+            <div className="bg-green-500/20 backdrop-blur-md p-4 rounded-xl shadow">
+              💼 Go to Hustle Tracker
+            </div>
+          </Link>
+        </div>
       </div>
     </div>
   );
