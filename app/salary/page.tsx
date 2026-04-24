@@ -222,6 +222,7 @@ export default function SalaryApp() {
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
+              className="placeholder:text-white/70"
             />
 
             <Input className="text-white"
@@ -229,6 +230,7 @@ export default function SalaryApp() {
               placeholder="Salary" 
               value={salary}
               onChange={(e) => setSalary(e.target.value)}
+              className="placeholder:text-white/70"
             />
 
             <Button onClick={saveMonth} className="mt-2 w-full">
@@ -271,7 +273,7 @@ export default function SalaryApp() {
         {/* ACTIVE MONTH */}
         {activeMonth && (
           <>
-            <Card className="bg-white  backdrop-blur-md text-black border-white/10">
+            <Card className="bg-white/10  backdrop-blur-md text-black border-white/10">
               <CardContent className="p-4">
                 <h2 className="font-bold">{activeMonth.month}</h2>
 
@@ -282,7 +284,7 @@ export default function SalaryApp() {
             </Card>
 
             {/* EXPENSE FORM */}
-            <Card className="bg-white backdrop-blur-md text-black border-white/10">
+            <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
               <CardContent className="p-4">
                 <h2 className="font-bold">Add Expense</h2>
 
@@ -291,6 +293,7 @@ export default function SalaryApp() {
                   placeholder="Description"
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
+                  className="placeholder:text-white/70"
                 />
 
                 <Input
@@ -298,6 +301,7 @@ export default function SalaryApp() {
                   placeholder="Amount"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
+                  className="placeholder:text-white/70"
                 />
 
                 <Button onClick={addExpense} className="mt-2 w-full">
@@ -307,7 +311,7 @@ export default function SalaryApp() {
             </Card>
 
             {/* HISTORY */}
-            <Card className="bg-white backdrop-blur-md text-black border-white/10">
+            <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
               <CardContent className="p-4">
                 <h2 className="font-bold">Expense History</h2>
 

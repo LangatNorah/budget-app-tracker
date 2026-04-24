@@ -351,6 +351,7 @@ export default function HustlePage() {
                 placeholder="Buyer"
                 value={buyer}
                 onChange={(e) => setBuyer(e.target.value)}
+                className="placeholder:text-white/70"
               />
 
               <Input
@@ -358,6 +359,7 @@ export default function HustlePage() {
                 placeholder="Amount"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                className="placeholder:text-white/70"
               />
 
               <Button onClick={saveSale} className="mt-2 w-full">
@@ -410,6 +412,7 @@ export default function HustlePage() {
                 placeholder="Description"
                 value={expDesc}
                 onChange={(e) => setExpDesc(e.target.value)}
+                className="placeholder:text-white/70"
               />
 
               <Input
@@ -417,6 +420,7 @@ export default function HustlePage() {
                 placeholder="Amount"
                 value={expAmount}
                 onChange={(e) => setExpAmount(e.target.value)}
+                className="placeholder:text-white/70"
               />
 
               <Button onClick={saveExpense} className="mt-2 w-full">
