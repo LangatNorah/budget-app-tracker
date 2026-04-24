@@ -192,7 +192,7 @@ export default function SalaryApp() {
             </h2>
 
             <Input
-         type="month"
+              type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
               
