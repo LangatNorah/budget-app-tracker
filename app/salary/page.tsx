@@ -192,10 +192,11 @@ export default function SalaryApp() {
             </h2>
 
             <Input
+            className="text-white placeholder:text-white/70"
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="text-white placeholder:text-white/70"
+              
             />
 
             <Input
@@ -203,7 +204,7 @@ export default function SalaryApp() {
               placeholder="Salary"
               value={salary}
               onChange={(e) => setSalary(e.target.value)}
-              className="text-white placeholder:text-white/70"
+              
             />
 
             <Button onClick={saveMonth} className="mt-2 w-full">
@@ -259,7 +260,7 @@ export default function SalaryApp() {
                   placeholder="Description"
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
-                  className="text-white placeholder:text-white/70"
+                  
                 />
 
                 <Input
@@ -267,7 +268,7 @@ export default function SalaryApp() {
                   placeholder="Amount"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="text-white placeholder:text-white/70"
+                  
                 />
 
                 <Button onClick={addExpense} className="mt-2 w-full">
