@@ -353,6 +353,41 @@ export default function HustlePage() {
             </CardContent>
           </Card>
 
+          {/* SALES HISTORY */}
+<Card>
+  <CardContent className="p-4">
+    <h2 className="font-bold">Sales History</h2>
+
+    {(activeCapital.sales || []).length === 0 ? (
+      <p>No sales yet</p>
+    ) : (
+      activeCapital.sales.map((s, i) => (
+        <div key={i} className="flex justify-between border-b py-1">
+          <span>
+            {s.buyer} ({s.date}) - {s.amount}
+          </span>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => editSale(i)}
+              className="text-blue-500 text-sm"
+            >
+              Edit
+            </button>
+
+            <button
+              onClick={() => deleteSale(i)}
+              className="text-red-500 text-sm"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ))
+    )}
+  </CardContent>
+</Card>
+
           {/* EXPENSES */}
           <Card>
             <CardContent className="p-4">
@@ -376,6 +411,41 @@ export default function HustlePage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* EXPENSE HISTORY */}
+<Card>
+  <CardContent className="p-4">
+    <h2 className="font-bold">Expense History</h2>
+
+    {(activeCapital.expenses || []).length === 0 ? (
+      <p>No expenses yet</p>
+    ) : (
+      activeCapital.expenses.map((e, i) => (
+        <div key={i} className="flex justify-between border-b py-1">
+          <span>
+            {e.desc} ({e.date}) - {e.amount}
+          </span>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => editExpense(i)}
+              className="text-blue-500 text-sm"
+            >
+              Edit
+            </button>
+
+            <button
+              onClick={() => deleteExpense(i)}
+              className="text-red-500 text-sm"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ))
+    )}
+  </CardContent>
+</Card>
         </>
       )}
     </div>

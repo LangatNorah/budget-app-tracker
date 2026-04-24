@@ -7,75 +7,107 @@ import { useRouter } from "next/navigation";
 import { onSnapshot, collection } from "firebase/firestore";
 import Link from "next/link";
 
+/* ================= TYPES ================= */
+
+type Expense = {
+  amount?: number | string;
+};
+
+type Month = {
+  salary?: number | string;
+  expenses?: Expense[];
+};
+
+type Hustle = {
+  capital?: number | string;
+  sales?: Expense[];
+  expenses?: Expense[];
+};
+
+/* ================= COMPONENT ================= */
+
 export default function Home() {
   const router = useRouter();
 
-  // ✅ FIX: proper typing
   const [user, setUser] = useState<User | null>(null);
-
-  // ✅ FIX: avoid "never[]" error
-  const [months, setMonths] = useState<any[]>([]);
-  const [hustles, setHustles] = useState<any[]>([]);
+  const [months, setMonths] = useState<Month[]>([]);
+  const [hustles, setHustles] = useState<Hustle[]>([]);
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
-      if (!u) router.push("/login");
+      if (!u) {
+        router.push("/login");
+        return;
+      }
       setUser(u);
     });
 
-    const unsub1 = onSnapshot(collection(db, "months"), (snap) => {
+    const unsubMonths = onSnapshot(collection(db, "months"), (snap) => {
       setMonths(
         snap.docs.map((d) => ({
-          ...d.data(),
-          expenses: d.data()?.expenses || [],
+          ...(d.data() as Month),
+          expenses: (d.data() as Month).expenses || [],
         }))
       );
     });
 
-    const unsub2 = onSnapshot(collection(db, "hustles"), (snap) => {
-      setHustles(snap.docs.map((d) => d.data()));
-    });
+    const unsubHustles = onSnapshot(
+      collection(db, "hustleCapitals"),
+      (snap) => {
+        const data: Hustle[] = snap.docs.map((doc) => {
+          const d = doc.data();
+
+          return {
+            capital: d.capital || 0,
+            sales: Array.isArray(d.sales) ? d.sales : [],
+            expenses: Array.isArray(d.expenses) ? d.expenses : [],
+          };
+        });
+
+        setHustles(data);
+      }
+    );
 
     return () => {
       unsubAuth();
-      unsub1();
-      unsub2();
+      unsubMonths();
+      unsubHustles();
     };
-  }, []);
+  }, [router]);
 
-  // CALCULATIONS
+  /* ================= CALCULATIONS ================= */
+
   const salary = months.reduce(
-    (sum, m) => sum + (Number(m.salary) || 0),
+    (sum, m) => sum + Number(m.salary || 0),
     0
   );
 
-  const expenses = months.reduce(
-    (sum, m) =>
+  const expenses = months.reduce((sum, m) => {
+    return (
       sum +
       (m.expenses || []).reduce(
-        (s: number, e: any) => s + (Number(e.amount) || 0),
+        (s, e) => s + Number(e.amount || 0),
         0
-      ),
-    0
-  );
+      )
+    );
+  }, 0);
 
+  // ✅ FIXED: now uses capital correctly
   const hustle = hustles.reduce(
-    (sum, h) => sum + (Number(h.amount) || 0),
+    (sum, h) => sum + Number(h.capital || 0),
     0
   );
 
   const balance = salary + hustle - expenses;
 
+  /* ================= UI ================= */
+
   if (!user) return null;
 
   return (
     <div className="p-4 max-w-md mx-auto pb-24">
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-bold">📊 Dashboard</h1>
-      </div>
+      <h1 className="text-xl font-bold mb-4">📊 Dashboard</h1>
 
-      {/* CARDS */}
       <div className="grid gap-3">
         <div className="bg-white p-4 rounded-xl shadow">
           💰 Salary
@@ -98,7 +130,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* NAV */}
       <div className="mt-6 grid gap-3">
         <Link href="/salary">
           <div className="bg-white p-4 rounded-xl shadow cursor-pointer">
