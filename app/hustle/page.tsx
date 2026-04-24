@@ -274,7 +274,7 @@ export default function HustlePage() {
             placeholder="Name"
             value={capitalName}
             onChange={(e) => setCapitalName(e.target.value)}
-            
+            className="text-white placeholder:text-white/70"
           />
 
           <Input
@@ -282,6 +282,7 @@ export default function HustlePage() {
             placeholder="Amount"
             value={capitalAmount}
             onChange={(e) => setCapitalAmount(e.target.value)}
+            className="text-white placeholder:text-white/70"
           />
 
           <Button onClick={saveCapital} className="mt-2 w-full">

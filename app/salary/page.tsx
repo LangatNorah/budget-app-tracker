@@ -92,28 +92,18 @@ export default function SalaryApp() {
     }
   };
 
-  // DELETE MONTH
   const deleteMonth = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, "months", id));
+    await deleteDoc(doc(db, "months", id));
 
-      if (activeMonth?.id === id) {
-        setActiveMonth(null);
-      }
-    } catch (err) {
-      console.error(err);
+    if (activeMonth?.id === id) {
+      setActiveMonth(null);
     }
   };
 
-  // SELECT MONTH
   const selectMonth = (m: any) => {
-    setActiveMonth({
-      ...m,
-      expenses: m.expenses || [],
-    });
+    setActiveMonth({ ...m, expenses: m.expenses || [] });
   };
 
-  // START EDIT MONTH
   const startEditMonth = (m: any) => {
     setEditId(m.id);
     setMonth(m.month);
@@ -122,37 +112,23 @@ export default function SalaryApp() {
 
   // ADD EXPENSE
   const addExpense = async () => {
-    try {
-      if (!desc || !amount) {
-        alert("Fill expense fields");
-        return;
-      }
+    if (!desc || !amount || !activeMonth?.id) return;
 
-      if (!activeMonth?.id) {
-        alert("Select month first");
-        return;
-      }
+    const ref = doc(db, "months", activeMonth.id);
 
-      const ref = doc(db, "months", activeMonth.id);
+    const updated = [
+      ...(activeMonth.expenses || []),
+      {
+        desc,
+        amount: Number(amount),
+        date: new Date().toLocaleDateString(),
+      },
+    ];
 
-      const updated = [
-        ...(activeMonth.expenses || []),
-        {
-          desc,
-          amount: Number(amount),
-          date: new Date().toLocaleDateString(),
-        },
-      ];
+    await updateDoc(ref, { expenses: updated });
 
-      await updateDoc(ref, {
-        expenses: updated,
-      });
-
-      setDesc("");
-      setAmount("");
-    } catch (err) {
-      console.error(err);
-    }
+    setDesc("");
+    setAmount("");
   };
 
   const editExpense = async (index: number) => {
@@ -239,29 +215,20 @@ export default function SalaryApp() {
         {/* MONTH LIST */}
         <Card className="bg-white/10 backdrop-blur-md border-white/10 text-white">
           <CardContent className="p-4">
-            <h2 className="font-bold">Months</h2>
+            <h2 className="font-bold text-black">Months</h2>
 
             {monthsData.map((m) => (
-              <div
-                key={m.id}
-                className="flex justify-between border-b border-white/10 py-2"
-              >
+              <div key={m.id} className="flex justify-between border-b py-2">
                 <div onClick={() => selectMonth(m)} className="cursor-pointer">
                   {m.month} - {m.salary}
                 </div>
 
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => startEditMonth(m)}
-                    className="text-blue-300 text-sm"
-                  >
+                  <button onClick={() => startEditMonth(m)} className="text-blue-800 text-sm">
                     Edit
                   </button>
 
-                  <button
-                    onClick={() => deleteMonth(m.id)}
-                    className="text-red-300 text-sm"
-                  >
+                  <button onClick={() => deleteMonth(m.id)} className="text-red-800 text-sm">
                     Delete
                   </button>
                 </div>
@@ -277,16 +244,16 @@ export default function SalaryApp() {
               <CardContent className="p-4">
                 <h2 className="font-bold">{activeMonth.month}</h2>
 
-                <p>Salary: {activeMonth.salary}</p>
-                <p>Total Expenses: {totalExpenses}</p>
-                <p className="font-bold">Balance: {balance}</p>
+                <p className="text-black">Salary: {activeMonth.salary}</p>
+                <p className="text-black">Total Expenses: {totalExpenses}</p>
+                <p className="font-bold text-black">Balance: {balance}</p>
               </CardContent>
             </Card>
 
             {/* EXPENSE FORM */}
             <Card className="bg-white/10 backdrop-blur-md border-white/10 text-white">
               <CardContent className="p-4">
-                <h2 className="font-bold">Add Expense</h2>
+                <h2 className="font-bold text-black">Add Expense</h2>
 
                 <Input
                   placeholder="Description"
@@ -312,16 +279,13 @@ export default function SalaryApp() {
             {/* HISTORY */}
             <Card className="bg-white/10 backdrop-blur-md border-white/10 text-white">
               <CardContent className="p-4">
-                <h2 className="font-bold">Expense History</h2>
+                <h2 className="font-bold text-black">Expense History</h2>
 
                 {(activeMonth.expenses || []).length === 0 ? (
                   <p>No expenses yet</p>
                 ) : (
                   activeMonth.expenses.map((e: any, i: number) => (
-                    <div
-                      key={i}
-                      className="flex justify-between border-b border-white/10 py-1"
-                    >
+                    <div key={i} className="flex justify-between border-b py-1 text-black">
                       <div>
                         <p>{e.desc}</p>
                         <p className="text-xs opacity-70">{e.date}</p>
@@ -330,17 +294,11 @@ export default function SalaryApp() {
                       <div className="flex gap-2 items-center">
                         <span>{e.amount}</span>
 
-                        <button
-                          onClick={() => editExpense(i)}
-                          className="text-blue-300 text-sm"
-                        >
+                        <button onClick={() => editExpense(i)} className="text-blue-800 text-sm">
                           Edit
                         </button>
 
-                        <button
-                          onClick={() => deleteExpense(i)}
-                          className="text-red-300 text-sm"
-                        >
+                        <button onClick={() => deleteExpense(i)} className="text-red-800 text-sm">
                           Delete
                         </button>
                       </div>
