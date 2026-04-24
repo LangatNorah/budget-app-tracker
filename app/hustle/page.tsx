@@ -274,6 +274,7 @@ export default function HustlePage() {
             placeholder="Name"
             value={capitalName}
             onChange={(e) => setCapitalName(e.target.value)}
+            
           />
 
           <Input

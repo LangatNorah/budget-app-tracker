@@ -32,10 +32,7 @@ export default function SalaryApp() {
 
   // LOAD MONTHS
   useEffect(() => {
-    const q = query(
-      collection(db, "months"),
-      orderBy("createdAt", "desc")
-    );
+    const q = query(collection(db, "months"), orderBy("createdAt", "desc"));
 
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map((d) => ({
@@ -197,40 +194,40 @@ export default function SalaryApp() {
   const balance = (activeMonth?.salary || 0) - totalExpenses;
 
   return (
-     <div className="relative min-h-screen text-white overflow-x-hidden">
+    <div className="relative min-h-screen text-white overflow-x-hidden">
 
-    {/* BACKGROUND */}
-    <div
-      className="fixed inset-0 bg-cover bg-center -z-20"
-      style={{ backgroundImage: "url('/money-bg.jpg')" }}
-    />
+      {/* BACKGROUND */}
+      <div
+        className="fixed inset-0 bg-cover bg-center -z-20"
+        style={{ backgroundImage: "url('/money-bg.jpg')" }}
+      />
 
-    {/* OVERLAY */}
-    <div className="fixed inset-0 bg-black/60 -z-10 pointer-events-none" />
+      {/* OVERLAY */}
+      <div className="fixed inset-0 bg-black/60 -z-10 pointer-events-none" />
 
-    {/* CONTENT */}
-    <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-40">
+      {/* CONTENT */}
+      <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-40">
 
         {/* MONTH FORM */}
-        <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
+        <Card className="bg-white/10 backdrop-blur-md border-white/10 text-white">
           <CardContent className="p-4">
             <h2 className="font-bold">
               {editId ? "Edit Month" : "Create Month"}
             </h2>
 
-            <Input className="text-white"
+            <Input
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="placeholder:text-white/70"
+              className="text-white placeholder:text-white/70"
             />
 
-            <Input className="text-white"
+            <Input
               type="number"
-              placeholder="Salary" 
+              placeholder="Salary"
               value={salary}
               onChange={(e) => setSalary(e.target.value)}
-              className="placeholder:text-white/70"
+              className="text-white placeholder:text-white/70"
             />
 
             <Button onClick={saveMonth} className="mt-2 w-full">
@@ -240,7 +237,7 @@ export default function SalaryApp() {
         </Card>
 
         {/* MONTH LIST */}
-        <Card className="bg-white/10  backdrop-blur-md text-black border-white/10">
+        <Card className="bg-white/10 backdrop-blur-md border-white/10 text-white">
           <CardContent className="p-4">
             <h2 className="font-bold">Months</h2>
 
@@ -249,19 +246,22 @@ export default function SalaryApp() {
                 key={m.id}
                 className="flex justify-between border-b border-white/10 py-2"
               >
-                <div
-                  onClick={() => selectMonth(m)}
-                  className="cursor-pointer"
-                >
+                <div onClick={() => selectMonth(m)} className="cursor-pointer">
                   {m.month} - {m.salary}
                 </div>
 
                 <div className="flex gap-2">
-                  <button onClick={() => startEditMonth(m)} className="text-blue-800 text-sm">
+                  <button
+                    onClick={() => startEditMonth(m)}
+                    className="text-blue-300 text-sm"
+                  >
                     Edit
                   </button>
 
-                  <button onClick={() => deleteMonth(m.id)} className="text-red-800 text-sm">
+                  <button
+                    onClick={() => deleteMonth(m.id)}
+                    className="text-red-300 text-sm"
+                  >
                     Delete
                   </button>
                 </div>
@@ -273,7 +273,7 @@ export default function SalaryApp() {
         {/* ACTIVE MONTH */}
         {activeMonth && (
           <>
-            <Card className="bg-white/10  backdrop-blur-md text-black border-white/10">
+            <Card className="bg-white/10 backdrop-blur-md border-white/10 text-white">
               <CardContent className="p-4">
                 <h2 className="font-bold">{activeMonth.month}</h2>
 
@@ -284,16 +284,15 @@ export default function SalaryApp() {
             </Card>
 
             {/* EXPENSE FORM */}
-            <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
+            <Card className="bg-white/10 backdrop-blur-md border-white/10 text-white">
               <CardContent className="p-4">
                 <h2 className="font-bold">Add Expense</h2>
 
                 <Input
-                
                   placeholder="Description"
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
-                  className="placeholder:text-white/70"
+                  className="text-white placeholder:text-white/70"
                 />
 
                 <Input
@@ -301,7 +300,7 @@ export default function SalaryApp() {
                   placeholder="Amount"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="placeholder:text-white/70"
+                  className="text-white placeholder:text-white/70"
                 />
 
                 <Button onClick={addExpense} className="mt-2 w-full">
@@ -311,7 +310,7 @@ export default function SalaryApp() {
             </Card>
 
             {/* HISTORY */}
-            <Card className="bg-white/10 backdrop-blur-md text-black border-white/10">
+            <Card className="bg-white/10 backdrop-blur-md border-white/10 text-white">
               <CardContent className="p-4">
                 <h2 className="font-bold">Expense History</h2>
 
@@ -331,11 +330,17 @@ export default function SalaryApp() {
                       <div className="flex gap-2 items-center">
                         <span>{e.amount}</span>
 
-                        <button onClick={() => editExpense(i)} className="text-blue-800 text-sm">
+                        <button
+                          onClick={() => editExpense(i)}
+                          className="text-blue-300 text-sm"
+                        >
                           Edit
                         </button>
 
-                        <button onClick={() => deleteExpense(i)} className="text-red-800 text-sm">
+                        <button
+                          onClick={() => deleteExpense(i)}
+                          className="text-red-300 text-sm"
+                        >
                           Delete
                         </button>
                       </div>
