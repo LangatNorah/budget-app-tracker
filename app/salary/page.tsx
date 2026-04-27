@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,9 +21,13 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+/* ================= COMPONENT ================= */
 
 export default function SalaryApp() {
+  const router = useRouter();
+
+  const [user, setUser] = useState<User | null>(null);
+
   const [month, setMonth] = useState("");
   const [salary, setSalary] = useState("");
   const [desc, setDesc] = useState("");
@@ -27,12 +35,29 @@ export default function SalaryApp() {
 
   const [monthsData, setMonthsData] = useState<any[]>([]);
   const [activeMonth, setActiveMonth] = useState<any | null>(null);
-
   const [editId, setEditId] = useState<string | null>(null);
 
-  /* ================= LOAD ================= */
+  /* ================= AUTH FIX ================= */
   useEffect(() => {
-    const q = query(collection(db, "months"), orderBy("createdAt", "desc"));
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!u) {
+        router.push("/login");
+        return;
+      }
+      setUser(u);
+    });
+
+    return () => unsub();
+  }, [router]);
+
+  /* ================= LOAD (USER SCOPED) ================= */
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, "users", user.uid, "months"),
+      orderBy("createdAt", "desc")
+    );
 
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map((d) => ({
@@ -45,43 +70,30 @@ export default function SalaryApp() {
     });
 
     return () => unsub();
-  }, []);
+  }, [user]);
 
-  /* ================= SYNC ================= */
-  useEffect(() => {
-    if (!activeMonth) return;
-
-    const updated = monthsData.find((m) => m.id === activeMonth.id);
-
-    if (updated) {
-      setActiveMonth({
-        ...updated,
-        expenses: updated.expenses || [],
-      });
-    }
-  }, [monthsData]);
-
-  /* ================= FIXED TOGGLE ================= */
+  /* ================= TOGGLE ================= */
   const selectMonth = (m: any) => {
-    if (activeMonth?.id === m.id) {
-      setActiveMonth(null); // close when clicked again
-    } else {
-      setActiveMonth({ ...m, expenses: m.expenses || [] });
-    }
+    setActiveMonth((prev: any) =>
+      prev?.id === m.id ? null : { ...m, expenses: m.expenses || [] }
+    );
   };
 
   /* ================= SAVE ================= */
   const saveMonth = async () => {
+    if (!user) return;
     if (!month || !salary) return alert("Fill all fields");
 
+    const ref = collection(db, "users", user.uid, "months");
+
     if (editId) {
-      await updateDoc(doc(db, "months", editId), {
+      await updateDoc(doc(db, "users", user.uid, "months", editId), {
         month,
         salary: Number(salary),
       });
       setEditId(null);
     } else {
-      await addDoc(collection(db, "months"), {
+      await addDoc(ref, {
         month,
         salary: Number(salary),
         expenses: [],
@@ -94,7 +106,10 @@ export default function SalaryApp() {
   };
 
   const deleteMonth = async (id: string) => {
-    await deleteDoc(doc(db, "months", id));
+    if (!user) return;
+
+    await deleteDoc(doc(db, "users", user.uid, "months", id));
+
     if (activeMonth?.id === id) setActiveMonth(null);
   };
 
@@ -106,7 +121,8 @@ export default function SalaryApp() {
 
   /* ================= EXPENSE ================= */
   const addExpense = async () => {
-    if (!desc || !amount || !activeMonth?.id) return;
+    if (!user || !activeMonth?.id) return;
+    if (!desc || !amount) return;
 
     const updated = [
       ...(activeMonth.expenses || []),
@@ -117,30 +133,34 @@ export default function SalaryApp() {
       },
     ];
 
-    await updateDoc(doc(db, "months", activeMonth.id), {
-      expenses: updated,
-    });
+    await updateDoc(
+      doc(db, "users", user.uid, "months", activeMonth.id),
+      { expenses: updated }
+    );
 
     setDesc("");
     setAmount("");
   };
 
   const deleteExpense = async (index: number) => {
-    if (!activeMonth) return;
+    if (!user || !activeMonth) return;
 
-    const updated = activeMonth.expenses.filter(
+    const updated = (activeMonth.expenses || []).filter(
       (_: any, i: number) => i !== index
     );
 
-    await updateDoc(doc(db, "months", activeMonth.id), {
-      expenses: updated,
-    });
+    await updateDoc(
+      doc(db, "users", user.uid, "months", activeMonth.id),
+      { expenses: updated }
+    );
   };
 
   const editExpense = async (index: number) => {
     if (!activeMonth) return;
 
-    const item = activeMonth.expenses[index];
+    const item = activeMonth.expenses?.[index];
+    if (!item) return;
+
     setDesc(item.desc);
     setAmount(String(item.amount));
 
@@ -156,20 +176,19 @@ export default function SalaryApp() {
 
   const balance = (activeMonth?.salary || 0) - totalExpenses;
 
+  if (!user) return null;
+
   /* ================= UI ================= */
   return (
     <div className="relative min-h-screen">
 
-      {/* BACKGROUND */}
       <div
         className="fixed inset-0 bg-cover bg-center -z-20"
         style={{ backgroundImage: "url('/money-bg.jpg')" }}
       />
 
-      {/* OVERLAY */}
       <div className="fixed inset-0 bg-black/60 -z-10" />
 
-      {/* CONTENT */}
       <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-40 text-black">
 
         {/* FORM */}
@@ -207,10 +226,7 @@ export default function SalaryApp() {
 
             {monthsData.map((m) => (
               <div key={m.id} className="flex justify-between border-b py-2">
-                <div
-                  onClick={() => selectMonth(m)}
-                  className="cursor-pointer"
-                >
+                <div onClick={() => selectMonth(m)} className="cursor-pointer">
                   {m.month} - {m.salary}
                 </div>
 
@@ -218,6 +234,7 @@ export default function SalaryApp() {
                   <button onClick={() => startEditMonth(m)} className="text-blue-600 text-sm">
                     Edit
                   </button>
+
                   <button onClick={() => deleteMonth(m.id)} className="text-red-600 text-sm">
                     Delete
                   </button>
@@ -233,7 +250,6 @@ export default function SalaryApp() {
             <Card className="bg-white shadow">
               <CardContent className="p-4">
                 <h2 className="font-bold">{activeMonth.month}</h2>
-
                 <p>Salary: {activeMonth.salary}</p>
                 <p>Total Expenses: {totalExpenses}</p>
                 <p className="font-bold">Balance: {balance}</p>
@@ -267,47 +283,34 @@ export default function SalaryApp() {
             </Card>
 
             {/* HISTORY */}
-   {/* EXPENSE HISTORY */}
-<Card className="bg-white border">
+            <Card className="bg-white border">
   <CardContent className="p-4">
     <h2 className="font-bold">Expense History</h2>
 
-    {(activeMonth.expenses || []).length === 0 ? (
-      <p>No expenses yet</p>
+    {(activeMonth?.expenses ?? []).length === 0 ? (
+      <p className="text-sm text-gray-500">No expenses yet</p>
     ) : (
-      activeMonth.expenses.map((e: any, i: number) => (
-        <div
-          key={i}
-          className="grid grid-cols-3 items-center border-b py-1"
-        >
-          {/* LEFT */}
-          <div className="text-left">
-            <p className="text-sm">
-              {e.desc} ({e.date})
-            </p>
+      (activeMonth?.expenses ?? []).map((e: any, i: number) => (
+        <div key={i} className="grid grid-cols-3 items-center border-b py-1">
+
+          <div className="text-left text-sm">
+            {e.desc} ({e.date})
           </div>
 
-          {/* MIDDLE (AMOUNT) */}
           <div className="text-center font-semibold">
             {e.amount}
           </div>
 
-          {/* RIGHT */}
           <div className="flex justify-end gap-2">
-            <button
-              onClick={() => editExpense(i)}
-              className="text-blue-600 text-sm"
-            >
+            <button onClick={() => editExpense(i)} className="text-blue-600 text-sm">
               Edit
             </button>
 
-            <button
-              onClick={() => deleteExpense(i)}
-              className="text-red-600 text-sm"
-            >
+            <button onClick={() => deleteExpense(i)} className="text-red-600 text-sm">
               Delete
             </button>
           </div>
+
         </div>
       ))
     )}

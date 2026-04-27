@@ -5,13 +5,10 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { onSnapshot, collection } from "firebase/firestore";
-import Link from "next/link";
 
 /* ================= TYPES ================= */
 
-type Expense = {
-  amount?: number | string;
-};
+type Expense = { amount?: number | string };
 
 type Month = {
   salary?: number | string;
@@ -20,11 +17,36 @@ type Month = {
 
 type Hustle = {
   capital?: number | string;
-  sales?: Expense[];
+  sales?: { amount?: number | string }[];
   expenses?: Expense[];
+  userId?: string;
 };
 
-/* ================= COMPONENT ================= */
+/* ================= ANIMATION HOOK ================= */
+
+function useCount(value: number, duration = 600) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const step = Math.max(1, Math.floor(value / (duration / 16)));
+
+    const interval = setInterval(() => {
+      start += step;
+
+      if (start >= value) {
+        setDisplay(value);
+        clearInterval(interval);
+      } else {
+        setDisplay(start);
+      }
+    }, 16);
+
+    return () => clearInterval(interval);
+  }, [value]);
+
+  return display;
+}
 
 export default function Home() {
   const router = useRouter();
@@ -32,126 +54,184 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [months, setMonths] = useState<Month[]>([]);
   const [hustles, setHustles] = useState<Hustle[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  /* ================= AUTH ================= */
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
-      if (!u) {
-        router.push("/login");
-        return;
-      }
-      setUser(u);
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!u) router.push("/login");
+      else setUser(u);
     });
 
-    const unsubMonths = onSnapshot(collection(db, "months"), (snap) => {
+    return () => unsub();
+  }, [router]);
+
+  /* ================= DATA ================= */
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const monthsRef = collection(db, "users", user.uid, "months");
+    const hustleRef = collection(db, "hustleCapitals");
+
+    const unsubMonths = onSnapshot(monthsRef, (snap) => {
       setMonths(
         snap.docs.map((d) => ({
           ...(d.data() as Month),
-          expenses: (d.data() as Month).expenses || [],
+          expenses: (d.data() as any).expenses || [],
         }))
       );
     });
 
-    const unsubHustles = onSnapshot(collection(db, "hustleCapitals"), (snap) => {
-      const data: Hustle[] = snap.docs.map((doc) => {
-        const d = doc.data();
-
-        return {
-          capital: d.capital || 0,
-          sales: Array.isArray(d.sales) ? d.sales : [],
-          expenses: Array.isArray(d.expenses) ? d.expenses : [],
-        };
-      });
-
-      setHustles(data);
+    const unsubHustles = onSnapshot(hustleRef, (snap) => {
+      setHustles(
+        snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Hustle) }))
+          .filter((h) => h.userId === user.uid)
+      );
     });
 
     return () => {
-      unsubAuth();
       unsubMonths();
       unsubHustles();
     };
-  }, [router]);
+  }, [user?.uid]);
 
   /* ================= CALCULATIONS ================= */
 
-  const salary = months.reduce(
-    (sum, m) => sum + Number(m.salary || 0),
-    0
-  );
+  const salaryRaw = months.reduce((s, m) => s + Number(m.salary || 0), 0);
 
-  const expenses = months.reduce((sum, m) => {
-    return (
-      sum +
+  const salaryExpensesRaw = months.reduce(
+    (s, m) =>
+      s +
       (m.expenses || []).reduce(
-        (s, e) => s + Number(e.amount || 0),
+        (a, e) => a + Number(e.amount || 0),
         0
-      )
-    );
-  }, 0);
-
-  const hustle = hustles.reduce(
-    (sum, h) => sum + Number(h.capital || 0),
+      ),
     0
   );
 
-  const balance = salary + hustle - expenses;
+  const hustleSalesRaw = hustles.reduce(
+    (s, h) =>
+      s +
+      (h.sales || []).reduce(
+        (a, x) => a + Number(x.amount || 0),
+        0
+      ),
+    0
+  );
 
-  /* ================= UI ================= */
+  const hustleCapitalRaw = hustles.reduce(
+    (s, h) => s + Number(h.capital || 0),
+    0
+  );
+
+  const hustleExpensesRaw = hustles.reduce(
+    (s, h) =>
+      s +
+      (h.expenses || []).reduce(
+        (a, e) => a + Number(e.amount || 0),
+        0
+      ),
+    0
+  );
+
+  const hustleProfitRaw = hustleSalesRaw - hustleCapitalRaw;
+  const totalExpensesRaw = salaryExpensesRaw + hustleExpensesRaw;
+  const balanceRaw = salaryRaw + hustleProfitRaw - totalExpensesRaw;
+
+  /* ================= ANIMATED VALUES ================= */
+
+  const salary = useCount(salaryRaw);
+  const hustleProfit = useCount(hustleProfitRaw);
+  const totalExpenses = useCount(totalExpensesRaw);
+  const balance = useCount(balanceRaw);
 
   if (!user) return null;
+
+  const cards = [
+    { label: "💰 Salary", value: salary },
+    { label: "💼 Hustle Profit", value: hustleProfit },
+    { label: "💸 Expenses", value: totalExpenses },
+    { label: "💵 Balance", value: balance },
+  ];
 
   return (
     <div className="relative min-h-screen text-black">
 
-      {/* BACKGROUND IMAGE */}
+      {/* BACKGROUND */}
       <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        className="fixed inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('/money-bg.jpg')" }}
       />
 
       {/* OVERLAY */}
       <div className="fixed inset-0 bg-black/60" />
 
-      {/* CONTENT */}
-      <div className="relative z-10 p-4 max-w-md mx-auto pb-24">
-        <h1 className="text-xl font-bold mb-4">📊 Dashboard</h1>
+      {/* CENTER */}
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
 
-        <div className="grid gap-3">
-          <div className="bg-white backdrop-blur-md p-4 rounded-xl shadow">
-            💰 Salary
-            <h2 className="font-bold text-xl">{salary}</h2>
+        <div className="w-full max-w-md">
+
+          <h1 className="text-xl font-bold mb-4 text-white text-center">
+            📊 Dashboard
+          </h1>
+
+          {/* SWIPE CARDS */}
+          <div
+            className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+            onScroll={(e) => {
+              const index = Math.round(
+                e.currentTarget.scrollLeft /
+                  e.currentTarget.clientWidth
+              );
+              setActiveIndex(index);
+            }}
+          >
+            {cards.map((c, i) => (
+              <div
+                key={i}
+                className="min-w-full snap-center bg-white p-6 rounded-2xl shadow-lg transition"
+              >
+                <p className="text-gray-500">{c.label}</p>
+
+                <h2
+                  className={`text-3xl font-bold mt-2 ${
+                    c.label.includes("Profit")
+                      ? c.value >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                      : ""
+                  }`}
+                >
+                  {c.value}
+                </h2>
+              </div>
+            ))}
           </div>
 
-          <div className="bg-white backdrop-blur-md p-4 rounded-xl shadow">
-            💼 Hustle
-            <h2 className="font-bold text-xl">{hustle}</h2>
+          {/* DOTS INDICATOR */}
+          <div className="flex justify-center gap-2 mt-4">
+            {cards.map((_, i) => (
+              <div
+                key={i}
+                className={`h-2 w-2 rounded-full transition ${
+                  i === activeIndex ? "bg-white" : "bg-white/40"
+                }`}
+              />
+            ))}
           </div>
 
-          <div className="bg-white backdrop-blur-md p-4 rounded-xl shadow">
-            💸 Expenses
-            <h2 className="font-bold text-xl">{expenses}</h2>
-          </div>
-
-          <div className="bg-white backdrop-blur-md p-4 rounded-xl shadow">
-            💵 Balance
-            <h2 className="font-bold text-xl">{balance}</h2>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-3">
-          <Link href="/salary">
-            <div className="bg-green-500/20 backdrop-blur-md p-4 rounded-xl shadow">
-              💰 Go to Salary Tracker
-            </div>
-          </Link>
-
-          <Link href="/hustle">
-            <div className="bg-green-500/20 backdrop-blur-md p-4 rounded-xl shadow">
-              💼 Go to Hustle Tracker
-            </div>
-          </Link>
         </div>
       </div>
+
+      {/* HIDE SCROLLBAR */}
+      <style jsx>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }
