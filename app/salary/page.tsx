@@ -252,28 +252,40 @@ export default function SalaryApp() {
         </Card>
 
         {/* MONTH LIST */}
-        <Card>
-          <CardContent className="p-4">
-            <h2 className="font-bold">Months</h2>
+     <Card>
+  <CardContent className="p-4">
+    <h2 className="font-bold">Months</h2>
 
-            {monthsData.map((m) => (
-              <div key={m.id} className="flex justify-between border-b py-2">
+    {monthsData.map((m) => (
+      <div key={m.id} className="flex justify-between border-b py-2">
 
-                <div
-                  onClick={() => selectMonth(m)}
-                  className="cursor-pointer"
-                >
-                  {m.month} - {m.salary}
-                </div>
+        <div
+          onClick={() => selectMonth(m)}
+          className="cursor-pointer"
+        >
+          {m.month} - {m.salary}
+        </div>
 
-                <div className="flex gap-2">
-                  <button onClick={() => startEdit(m)}>Edit</button>
-                  <button onClick={() => deleteMonth(m.id!)}>Del</button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <div className="flex gap-2">
+          <button
+            onClick={() => startEdit(m)}
+            className="text-blue-600 text-sm font-medium"
+          >
+            Edit
+          </button>
+
+          <button
+            onClick={() => deleteMonth(m.id!)}
+            className="text-red-600 text-sm font-medium"
+          >
+            Delete
+          </button>
+        </div>
+
+      </div>
+    ))}
+  </CardContent>
+</Card>
 
         {/* ACTIVE MONTH */}
         {activeMonth && (
