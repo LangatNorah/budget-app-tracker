@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { onSnapshot, collection } from "firebase/firestore";
@@ -41,6 +41,13 @@ export default function Home() {
 
     return () => unsub();
   }, [router]);
+
+  /* ================= LOGOUT ================= */
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push("/login");
+  };
 
   /* ================= DATA ================= */
 
@@ -120,6 +127,8 @@ export default function Home() {
 
   if (!user) return null;
 
+  /* ================= UI ================= */
+
   return (
     <div className="relative min-h-screen">
 
@@ -132,13 +141,24 @@ export default function Home() {
       {/* OVERLAY */}
       <div className="fixed inset-0 bg-black/60" />
 
-      {/* ✅ TOP LAYOUT (RESTORED) */}
-      <div className="relative z-10 p-4 max-w-md mx-auto">
+      {/* CONTENT */}
+      <div className="relative z-10 max-w-md mx-auto p-4">
 
-        <h1 className="text-xl font-bold mb-4 text-white">
-          📊 Dashboard
-        </h1>
+        {/* HEADER */}
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-xl font-bold text-white">
+            📊 Dashboard
+          </h1>
 
+          <button
+  onClick={handleLogout}
+  className="bg-blue-500 hover:bg-emerald-800 text-white px-4 py-1.5 rounded-full text-sm font-medium shadow-md transition-all duration-200 hover:shadow-emerald-400/40"
+>
+  Logout
+</button>
+        </div>
+
+        {/* CARDS */}
         <div className="grid gap-3">
 
           <div className="bg-white p-4 rounded-xl shadow">
