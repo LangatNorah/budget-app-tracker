@@ -310,32 +310,51 @@ export default function SalaryApp() {
             </Card>
 
             {/* HISTORY (NOW FIXED) */}
-            <Card>
-              <CardContent className="p-4">
-                <h2 className="font-bold">History</h2>
+     {/* HISTORY */}
+<Card>
+  <CardContent className="p-4">
+    <h2 className="font-bold">History</h2>
 
-                {(activeMonth.expenses || []).length === 0 ? (
-                  <p>No expenses yet</p>
-                ) : (
-                  activeMonth.expenses!.map((e, i) => (
-                    <div
-                      key={i}
-                      className="grid grid-cols-3 border-b py-1"
-                    >
-                      <div>{e.desc}</div>
-                      <div className="text-center">{e.amount}</div>
+    {(activeMonth.expenses || []).length === 0 ? (
+      <p>No expenses yet</p>
+    ) : (
+      activeMonth.expenses!.map((e, i) => (
+        <div
+          key={i}
+          className="grid grid-cols-3 border-b py-2 items-center"
+        >
+          {/* DESCRIPTION + DATE */}
+          <div className="text-left">
+            <div className="font-medium">{e.desc}</div>
+            <div className="text-xs text-gray-500">{e.date}</div>
+          </div>
 
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => editExpense(i)}>Edit</button>
-                        <button onClick={() => deleteExpense(i)}>
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+          {/* AMOUNT */}
+          <div className="text-center font-semibold">
+            {e.amount}
+          </div>
+
+          {/* ACTIONS */}
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => editExpense(i)}
+              className="text-blue-600 text-sm"
+            >
+              Edit
+            </button>
+
+            <button
+              onClick={() => deleteExpense(i)}
+              className="text-red-600 text-sm"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ))
+    )}
+  </CardContent>
+</Card>
           </>
         )}
       </div>
