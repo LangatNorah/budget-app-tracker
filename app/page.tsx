@@ -77,40 +77,40 @@ export default function Home() {
 
   const salary = months.reduce((s, m) => s + Number(m.salary || 0), 0);
 
-  const salaryExpenses = months.reduce((s, m) => {
-    return (
+  const salaryExpenses = months.reduce(
+    (s, m) =>
       s +
       (m.expenses || []).reduce(
         (a, e) => a + Number(e.amount || 0),
         0
-      )
-    );
-  }, 0);
-
-  const hustleSales = hustles.reduce((sum, h) => {
-    return (
-      sum +
-      (h.sales || []).reduce(
-        (acc, x) => acc + Number(x.amount || 0),
-        0
-      )
-    );
-  }, 0);
-
-  const hustleCapital = hustles.reduce(
-    (sum, h) => sum + Number(h.capital || 0),
+      ),
     0
   );
 
-  const hustleExpenses = hustles.reduce((sum, h) => {
-    return (
-      sum +
-      (h.expenses || []).reduce(
-        (acc, e) => acc + Number(e.amount || 0),
+  const hustleSales = hustles.reduce(
+    (s, h) =>
+      s +
+      (h.sales || []).reduce(
+        (a, x) => a + Number(x.amount || 0),
         0
-      )
-    );
-  }, 0);
+      ),
+    0
+  );
+
+  const hustleCapital = hustles.reduce(
+    (s, h) => s + Number(h.capital || 0),
+    0
+  );
+
+  const hustleExpenses = hustles.reduce(
+    (s, h) =>
+      s +
+      (h.expenses || []).reduce(
+        (a, e) => a + Number(e.amount || 0),
+        0
+      ),
+    0
+  );
 
   /* ================= FORMULA ================= */
 
@@ -121,7 +121,7 @@ export default function Home() {
   if (!user) return null;
 
   return (
-    <div className="relative min-h-screen text-black">
+    <div className="relative min-h-screen">
 
       {/* BACKGROUND */}
       <div
@@ -132,40 +132,37 @@ export default function Home() {
       {/* OVERLAY */}
       <div className="fixed inset-0 bg-black/60" />
 
-      {/* ✅ FIX: TRUE VERTICAL CENTERING */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+      {/* ✅ TOP LAYOUT (RESTORED) */}
+      <div className="relative z-10 p-4 max-w-md mx-auto">
 
-        <div className="w-full max-w-md">
+        <h1 className="text-xl font-bold mb-4 text-white">
+          📊 Dashboard
+        </h1>
 
-          <h1 className="text-xl font-bold mb-4 text-white">
-            📊 Dashboard
-          </h1>
+        <div className="grid gap-3">
 
-          <div className="grid gap-3">
+          <div className="bg-white p-4 rounded-xl shadow">
+            💰 Salary
+            <h2 className="font-bold">{salary}</h2>
+          </div>
 
-            <div className="bg-white p-4 rounded-xl">
-              💰 Salary
-              <h2 className="font-bold">{salary}</h2>
-            </div>
+          <div className="bg-white p-4 rounded-xl shadow">
+            💼 Hustle Profit
+            <h2 className="font-bold">{hustleProfit}</h2>
+          </div>
 
-            <div className="bg-white p-4 rounded-xl">
-              💼 Hustle Profit
-              <h2 className="font-bold">{hustleProfit}</h2>
-            </div>
+          <div className="bg-white p-4 rounded-xl shadow">
+            💸 Expenses
+            <h2 className="font-bold">{totalExpenses}</h2>
+          </div>
 
-            <div className="bg-white p-4 rounded-xl">
-              💸 Expenses
-              <h2 className="font-bold">{totalExpenses}</h2>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl">
-              💵 Balance
-              <h2 className="font-bold">{balance}</h2>
-            </div>
-
+          <div className="bg-white p-4 rounded-xl shadow">
+            💵 Balance
+            <h2 className="font-bold">{balance}</h2>
           </div>
 
         </div>
+
       </div>
     </div>
   );
