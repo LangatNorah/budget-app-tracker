@@ -6,10 +6,12 @@ const nextConfig: NextConfig = {
 
 //export default nextConfig;
 
-const withPWA = require("next-pwa")({
-  dest: "public",
-});
+import type { NextConfig } from "next";
 
-module.exports = withPWA({
-  reactStrictMode: true,
-});
+const nextConfig: NextConfig = {
+  webpack: (config) => {
+    return config;
+  },
+};
+
+export default nextConfig;
