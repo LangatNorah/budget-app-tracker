@@ -51,22 +51,19 @@ export default function Home() {
       );
     });
 
-    const unsubHustles = onSnapshot(
-      collection(db, "hustleCapitals"),
-      (snap) => {
-        const data: Hustle[] = snap.docs.map((doc) => {
-          const d = doc.data();
+    const unsubHustles = onSnapshot(collection(db, "hustleCapitals"), (snap) => {
+      const data: Hustle[] = snap.docs.map((doc) => {
+        const d = doc.data();
 
-          return {
-            capital: d.capital || 0,
-            sales: Array.isArray(d.sales) ? d.sales : [],
-            expenses: Array.isArray(d.expenses) ? d.expenses : [],
-          };
-        });
+        return {
+          capital: d.capital || 0,
+          sales: Array.isArray(d.sales) ? d.sales : [],
+          expenses: Array.isArray(d.expenses) ? d.expenses : [],
+        };
+      });
 
-        setHustles(data);
-      }
-    );
+      setHustles(data);
+    });
 
     return () => {
       unsubAuth();
@@ -104,38 +101,38 @@ export default function Home() {
   if (!user) return null;
 
   return (
-    <div
-      className="min-h-screen bg-no-repeat bg-cover bg-center bg-fixed relative text-white"
-      style={{
-        backgroundImage: "url('/money-bg.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
-    >
-      {/* overlay */}
-      <div className="absolute inset-0 bg-black/60" />
+    <div className="relative min-h-screen text-black">
 
-      {/* content */}
+      {/* BACKGROUND IMAGE */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/money-bg.jpg')" }}
+      />
+
+      {/* OVERLAY */}
+      <div className="fixed inset-0 bg-black/60" />
+
+      {/* CONTENT */}
       <div className="relative z-10 p-4 max-w-md mx-auto pb-24">
         <h1 className="text-xl font-bold mb-4">📊 Dashboard</h1>
 
         <div className="grid gap-3">
-          <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl shadow">
+          <div className="bg-white backdrop-blur-md p-4 rounded-xl shadow">
             💰 Salary
             <h2 className="font-bold text-xl">{salary}</h2>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl shadow">
+          <div className="bg-white backdrop-blur-md p-4 rounded-xl shadow">
             💼 Hustle
             <h2 className="font-bold text-xl">{hustle}</h2>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl shadow">
+          <div className="bg-white backdrop-blur-md p-4 rounded-xl shadow">
             💸 Expenses
             <h2 className="font-bold text-xl">{expenses}</h2>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl shadow">
+          <div className="bg-white backdrop-blur-md p-4 rounded-xl shadow">
             💵 Balance
             <h2 className="font-bold text-xl">{balance}</h2>
           </div>
