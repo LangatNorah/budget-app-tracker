@@ -2,13 +2,23 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
-  const isLoggedIn = req.cookies.get("auth-token"); // or session cookie
+  const { pathname } = req.nextUrl;
 
-  const isLoginPage = req.nextUrl.pathname === "/login";
+  // ✅ Allow these public routes
+  const publicRoutes = ["/login", "/signup"];
 
-  if (!isLoggedIn && !isLoginPage) {
-    return NextResponse.redirect(new URL("/login", req.url));
+  const isPublic = publicRoutes.includes(pathname);
+
+  // OPTIONAL: if you are NOT using cookies yet, just allow everything
+  // and rely on client-side auth redirect instead
+
+  if (isPublic) {
+    return NextResponse.next();
   }
 
   return NextResponse.next();
 }
+
+export const config = {
+  matcher: ["/((?!_next|favicon.ico).*)"],
+};
