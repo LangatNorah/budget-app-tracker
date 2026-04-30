@@ -27,7 +27,7 @@ type Expense = {
   desc: string;
   amount: number;
   date: string;
-  category: string; // ✅ NEW
+  category: string;
 };
 
 type Month = {
@@ -49,14 +49,14 @@ export default function SalaryApp() {
 
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("Food"); // ✅ NEW
+
+  // ✅ FIXED CATEGORY SYSTEM (MATCHES DASHBOARD)
+  const [category, setCategory] = useState("Needs");
 
   const [monthsData, setMonthsData] = useState<Month[]>([]);
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
 
   const [editId, setEditId] = useState<string | null>(null);
-
-  // expense editing
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   /* ================= AUTH ================= */
@@ -97,7 +97,7 @@ export default function SalaryApp() {
     return () => unsub();
   }, [user?.uid]);
 
-  /* ================= SELECT ================= */
+  /* ================= MONTH SELECT ================= */
 
   const selectMonth = (m: Month) => {
     setActiveMonth((prev) => (prev?.id === m.id ? null : m));
@@ -116,6 +116,7 @@ export default function SalaryApp() {
         month,
         salary: Number(salary),
       });
+
       setEditId(null);
     } else {
       await addDoc(ref, {
@@ -157,7 +158,6 @@ export default function SalaryApp() {
     let updated = [...(activeMonth.expenses || [])];
 
     if (editingIndex !== null) {
-      // ✅ UPDATE EXISTING (no duplicate)
       updated[editingIndex] = {
         desc,
         amount: Number(amount),
@@ -165,7 +165,6 @@ export default function SalaryApp() {
         date: new Date().toLocaleDateString(),
       };
     } else {
-      // ✅ ADD NEW
       updated.push({
         desc,
         amount: Number(amount),
@@ -174,15 +173,13 @@ export default function SalaryApp() {
       });
     }
 
-    await updateDoc(
-      doc(db, "users", user.uid, "months", activeMonth.id),
-      { expenses: updated }
-    );
+    await updateDoc(doc(db, "users", user.uid, "months", activeMonth.id), {
+      expenses: updated,
+    });
 
-    // reset
     setDesc("");
     setAmount("");
-    setCategory("Food");
+    setCategory("Needs");
     setEditingIndex(null);
   };
 
@@ -195,10 +192,9 @@ export default function SalaryApp() {
       (_, i) => i !== index
     );
 
-    await updateDoc(
-      doc(db, "users", user.uid, "months", activeMonth.id),
-      { expenses: updated }
-    );
+    await updateDoc(doc(db, "users", user.uid, "months", activeMonth.id), {
+      expenses: updated,
+    });
   };
 
   /* ================= EDIT EXPENSE ================= */
@@ -211,9 +207,8 @@ export default function SalaryApp() {
 
     setDesc(item.desc);
     setAmount(String(item.amount));
-    setCategory(item.category || "Food");
-
-    setEditingIndex(index); // ✅ KEY FIX
+    setCategory(item.category || "Needs");
+    setEditingIndex(index);
   };
 
   /* ================= CALC ================= */
@@ -247,7 +242,6 @@ export default function SalaryApp() {
           <CardContent className="p-4">
             <h2 className="font-bold">Month</h2>
 
-            {/* ✅ RESTORED CALENDAR INPUT */}
             <input
               type="month"
               value={month}
@@ -301,7 +295,7 @@ export default function SalaryApp() {
           </CardContent>
         </Card>
 
-        {/* ACTIVE */}
+        {/* ACTIVE MONTH */}
         {activeMonth && (
           <>
             <Card>
@@ -330,18 +324,15 @@ export default function SalaryApp() {
                   onChange={(e) => setAmount(e.target.value)}
                 />
 
-                {/* ✅ CATEGORY SELECT */}
+                {/* ✅ FIXED CATEGORY SYSTEM */}
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full border rounded-md px-3 py-2 mt-2"
                 >
-                  <option>Food</option>
-                  <option>Transport</option>
-                  <option>Fees</option>
-                  <option>Shopping</option>
-                  <option>Rent</option>
-                  <option>Other</option>
+                  <option value="Needs">Needs</option>
+                  <option value="Wants">Wants</option>
+                  <option value="Savings">Savings</option>
                 </select>
 
                 <Button onClick={saveExpense} className="w-full mt-2">
