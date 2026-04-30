@@ -13,6 +13,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+import { AlertTriangle } from "lucide-react";
+
 /* ================= COMPONENT ================= */
 
 export default function Home() {
@@ -21,6 +23,9 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [months, setMonths] = useState<any[]>([]);
   const [hustles, setHustles] = useState<any[]>([]);
+
+    // ✅ ONLY NEW STATE
+  const [showWarning, setShowWarning] = useState(false);
 
   /* ================= AUTH ================= */
 
@@ -71,19 +76,50 @@ export default function Home() {
     };
   }, [user?.uid]);
 
-  /* ================= CALCULATIONS ================= */
+  /* ================= SALARY ================= */
 
-  const salary = months.reduce((s, m) => s + Number(m.salary || 0), 0);
-
-  const expenses = months.reduce(
-    (s, m) =>
-      s +
-      (m.expenses || []).reduce(
-        (a: number, e: any) => a + Number(e.amount || 0),
-        0
-      ),
+  const salaryTotal = months.reduce(
+    (s, m) => s + Number(m.salary || 0),
     0
   );
+
+  const allExpenses = months.flatMap((m) => m.expenses || []);
+
+  /* ================= CATEGORY SPENDING ================= */
+
+  const needsSpent = allExpenses
+    .filter((e: any) => e.category === "Needs")
+    .reduce((a, e) => a + Number(e.amount || 0), 0);
+
+  const wantsSpent = allExpenses
+    .filter((e: any) => e.category === "Wants")
+    .reduce((a, e) => a + Number(e.amount || 0), 0);
+
+  const savingsSpent = allExpenses
+    .filter((e: any) => e.category === "Savings")
+    .reduce((a, e) => a + Number(e.amount || 0), 0);
+
+  /* ================= BUDGET (50/30/20) ================= */
+
+  const needsBudget = salaryTotal * 0.5;
+  const wantsBudget = salaryTotal * 0.3;
+  const savingsBudget = salaryTotal * 0.2;
+
+  /* ================= % DEPLETION ================= */
+
+  const needsPercent = needsBudget
+    ? (needsSpent / needsBudget) * 100
+    : 0;
+
+  const wantsPercent = wantsBudget
+    ? (wantsSpent / wantsBudget) * 100
+    : 0;
+
+  const savingsPercent = savingsBudget
+    ? (savingsSpent / savingsBudget) * 100
+    : 0;
+
+  /* ================= HUSTLE ================= */
 
   const hustleSales = hustles.reduce(
     (s, h) =>
@@ -110,21 +146,33 @@ export default function Home() {
     0
   );
 
-  const hustleProfit = hustleSales - hustleCapital - hustleExpenses;
+  const hustleProfit =
+    hustleSales - hustleCapital - hustleExpenses;
 
-  /* ================= SALARY BUDGET ================= */
-
-  const needs = salary * 0.5;
-  const wants = salary * 0.3;
-  const savings = salary * 0.2;
+  /* ================= CHART DATA ================= */
 
   const budgetData = [
-    { name: "Needs", value: needs },
-    { name: "Wants", value: wants },
-    { name: "Savings", value: savings },
+    {
+      name: "Needs",
+      value: Math.max(needsBudget - needsSpent, 0),
+    },
+    {
+      name: "Wants",
+      value: Math.max(wantsBudget - wantsSpent, 0),
+    },
+    {
+      name: "Savings",
+      value: Math.max(savingsBudget - savingsSpent, 0),
+    },
   ];
 
-  const isLow = expenses > salary * 0.8;
+  const spentData = [
+    { name: "Needs", value: needsSpent },
+    { name: "Wants", value: wantsSpent },
+    { name: "Savings", value: savingsSpent },
+  ];
+
+  const isLow = needsPercent > 80 || wantsPercent > 80;
 
   if (!user) return null;
 
@@ -146,6 +194,13 @@ export default function Home() {
             Budget Dashboard
           </h1>
 
+          {/* WARNING ICON (ONLY WHEN DANGER) */}
+{isLow && (
+  <button onClick={() => setShowWarning(!showWarning)}>
+    <AlertTriangle className="w-6 h-6 text-red-400 hover:text-red-300 animate-pulse" />
+  </button>
+)}
+
           <button
             onClick={handleLogout}
             className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm"
@@ -154,52 +209,76 @@ export default function Home() {
           </button>
         </div>
 
-        {/* ================= 2 COLUMN LAYOUT ================= */}
+         {/* WARNING CONTENT (TOGGLE ONLY WHEN DANGER) */}
+{isLow && showWarning && (
+  <div className="bg-red-500 text-white p-3 rounded-xl text-sm mb-4">
+    ⚠️ Warning: You are overspending in one or more categories.
+  </div>
+)}
+        {/* 2 COLUMN LAYOUT */}
         <div className="grid md:grid-cols-2 gap-4">
 
           {/* ================= SALARY ================= */}
           <div className="bg-white/90 p-5 rounded-2xl">
 
             <h2 className="text-sm font-semibold text-gray-600 mb-3">
-              💰 Salary Budget Plan
+              💰 Salary Budget (50/30/20)
             </h2>
 
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
+
+                {/* Remaining */}
                 <Pie
                   data={budgetData}
                   dataKey="value"
                   outerRadius={80}
-                  innerRadius={50}
+                  innerRadius={55}
                 >
                   <Cell fill="#3b82f6" />
                   <Cell fill="#f59e0b" />
                   <Cell fill="#22c55e" />
                 </Pie>
+
+                {/* Spent overlay */}
+                <Pie
+                  data={spentData}
+                  dataKey="value"
+                  outerRadius={80}
+                  innerRadius={55}
+                >
+                  <Cell fill="#00000020" />
+                  <Cell fill="#00000020" />
+                  <Cell fill="#00000020" />
+                </Pie>
+
               </PieChart>
             </ResponsiveContainer>
 
-            {/* ✅ FIXED SALARY LEGEND BOXES (YOUR STYLE) */}
+            {/* LEGEND WITH % USED */}
             <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
 
               <div className="border-l-4 border-blue-500 bg-blue-50 p-2 rounded-lg">
-                <p className="text-gray-600 font-medium">Needs</p>
-                <p className="text-xs text-gray-500">
-                  {needs.toFixed(0)} (50%)
+                <p className="font-medium">Needs</p>
+                <p>{needsPercent.toFixed(0)}% used</p>
+                <p className="text-[10px] text-gray-500">
+                  {needsSpent} / {needsBudget}
                 </p>
               </div>
 
               <div className="border-l-4 border-yellow-500 bg-yellow-50 p-2 rounded-lg">
-                <p className="text-gray-600 font-medium">Wants</p>
-                <p className="text-xs text-gray-500">
-                  {wants.toFixed(0)} (30%)
+                <p className="font-medium">Wants</p>
+                <p>{wantsPercent.toFixed(0)}% used</p>
+                <p className="text-[10px] text-gray-500">
+                  {wantsSpent} / {wantsBudget}
                 </p>
               </div>
 
               <div className="border-l-4 border-green-500 bg-green-50 p-2 rounded-lg">
-                <p className="text-gray-600 font-medium">Savings</p>
-                <p className="text-xs text-gray-500">
-                  {savings.toFixed(0)} (20%)
+                <p className="font-medium">Savings</p>
+                <p>{savingsPercent.toFixed(0)}% used</p>
+                <p className="text-[10px] text-gray-500">
+                  {savingsSpent} / {savingsBudget}
                 </p>
               </div>
 
@@ -261,13 +340,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ALERT */}
-        {isLow && (
-          <div className="bg-red-500 text-white p-3 rounded-xl text-sm mt-4">
-            ⚠️ Warning: You are close to exceeding your salary budget.
-          </div>
-        )}
-
+       
       </div>
     </div>
   );
