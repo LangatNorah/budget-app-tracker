@@ -53,6 +53,7 @@ export default function SalaryApp() {
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
 
   const [editId, setEditId] = useState<string | null>(null);
+  const [editExpenseIndex, setEditExpenseIndex] = useState<number | null>(null);
 
   /* ================= AUTH ================= */
 
@@ -84,7 +85,6 @@ export default function SalaryApp() {
 
       setMonthsData(data);
 
-      // auto select first month if none selected
       if (!activeMonth && data.length > 0) {
         setActiveMonth(data[0]);
       }
@@ -93,7 +93,7 @@ export default function SalaryApp() {
     return () => unsub();
   }, [user?.uid]);
 
-  /* ================= SELECT MONTH ================= */
+  /* ================= SELECT ================= */
 
   const selectMonth = (m: Month) => {
     setActiveMonth((prev) => (prev?.id === m.id ? null : m));
@@ -103,7 +103,6 @@ export default function SalaryApp() {
 
   const saveMonth = async () => {
     if (!user?.uid) return;
-
     if (!month || !salary) return;
 
     const ref = collection(db, "users", user.uid, "months");
@@ -113,7 +112,6 @@ export default function SalaryApp() {
         month,
         salary: Number(salary),
       });
-
       setEditId(null);
     } else {
       await addDoc(ref, {
@@ -135,9 +133,7 @@ export default function SalaryApp() {
 
     await deleteDoc(doc(db, "users", user.uid, "months", id));
 
-    if (activeMonth?.id === id) {
-      setActiveMonth(null);
-    }
+    if (activeMonth?.id === id) setActiveMonth(null);
   };
 
   /* ================= EDIT MONTH ================= */
@@ -148,20 +144,31 @@ export default function SalaryApp() {
     setSalary(String(m.salary || ""));
   };
 
-  /* ================= ADD EXPENSE (FIXED) ================= */
+  /* ================= ADD / UPDATE EXPENSE ================= */
 
   const addExpense = async () => {
     if (!user?.uid || !activeMonth?.id) return;
     if (!desc || !amount) return;
 
-    const updated: Expense[] = [
-      ...(activeMonth.expenses || []),
-      {
+    let updated = [...(activeMonth.expenses || [])];
+
+    if (editExpenseIndex !== null) {
+      // UPDATE
+      updated[editExpenseIndex] = {
+        ...updated[editExpenseIndex],
+        desc,
+        amount: Number(amount),
+        date: updated[editExpenseIndex].date,
+      };
+      setEditExpenseIndex(null);
+    } else {
+      // ADD NEW
+      updated.push({
         desc,
         amount: Number(amount),
         date: new Date().toLocaleDateString(),
-      },
-    ];
+      });
+    }
 
     await updateDoc(
       doc(db, "users", user.uid, "months", activeMonth.id),
@@ -172,7 +179,7 @@ export default function SalaryApp() {
     setAmount("");
   };
 
-  /* ================= DELETE EXPENSE (FIXED) ================= */
+  /* ================= DELETE EXPENSE ================= */
 
   const deleteExpense = async (index: number) => {
     if (!user?.uid || !activeMonth?.id) return;
@@ -187,7 +194,7 @@ export default function SalaryApp() {
     );
   };
 
-  /* ================= EDIT EXPENSE (FIXED PROPERLY) ================= */
+  /* ================= EDIT EXPENSE ================= */
 
   const editExpense = (index: number) => {
     if (!activeMonth) return;
@@ -197,8 +204,7 @@ export default function SalaryApp() {
 
     setDesc(item.desc);
     setAmount(String(item.amount));
-
-    // DO NOT DELETE HERE (this was your bug)
+    setEditExpenseIndex(index);
   };
 
   /* ================= CALC ================= */
@@ -232,10 +238,12 @@ export default function SalaryApp() {
           <CardContent className="p-4">
             <h2 className="font-bold">Month</h2>
 
-            <Input
+            {/* CALENDAR PICKER */}
+            <input
+              type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              placeholder="Month"
+              className="w-full border rounded-md px-3 py-2 bg-white text-black"
             />
 
             <Input
@@ -246,46 +254,43 @@ export default function SalaryApp() {
             />
 
             <Button onClick={saveMonth} className="w-full mt-2">
-              {editId ? "Update" : "Save"}
+              {editId ? "Update Month" : "Save Month"}
             </Button>
           </CardContent>
         </Card>
 
         {/* MONTH LIST */}
-     <Card>
-  <CardContent className="p-4">
-    <h2 className="font-bold">Months</h2>
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="font-bold">Months</h2>
 
-    {monthsData.map((m) => (
-      <div key={m.id} className="flex justify-between border-b py-2">
+            {monthsData.map((m) => (
+              <div key={m.id} className="flex justify-between border-b py-2">
 
-        <div
-          onClick={() => selectMonth(m)}
-          className="cursor-pointer"
-        >
-          {m.month} - {m.salary}
-        </div>
+                <div onClick={() => selectMonth(m)} className="cursor-pointer">
+                  {m.month} - {m.salary}
+                </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => startEdit(m)}
-            className="text-blue-600 text-sm font-medium"
-          >
-            Edit
-          </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => startEdit(m)}
+                    className="text-blue-600 text-sm"
+                  >
+                    Edit
+                  </button>
 
-          <button
-            onClick={() => deleteMonth(m.id!)}
-            className="text-red-600 text-sm font-medium"
-          >
-            Delete
-          </button>
-        </div>
+                  <button
+                    onClick={() => deleteMonth(m.id!)}
+                    className="text-red-600 text-sm"
+                  >
+                    Delete
+                  </button>
+                </div>
 
-      </div>
-    ))}
-  </CardContent>
-</Card>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         {/* ACTIVE MONTH */}
         {activeMonth && (
@@ -303,70 +308,66 @@ export default function SalaryApp() {
             <Card>
               <CardContent className="p-4">
                 <Input
-                  placeholder="Desc"
+                  placeholder="Description"
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
                 />
 
                 <Input
-                  placeholder="Amount"
                   type="number"
+                  placeholder="Amount"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
 
                 <Button onClick={addExpense} className="w-full mt-2">
-                  Add Expense
+                  {editExpenseIndex !== null ? "Update Expense" : "Add Expense"}
                 </Button>
               </CardContent>
             </Card>
 
-            {/* HISTORY (NOW FIXED) */}
-     {/* HISTORY */}
-<Card>
-  <CardContent className="p-4">
-    <h2 className="font-bold">History</h2>
+            {/* HISTORY */}
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="font-bold">History</h2>
 
-    {(activeMonth.expenses || []).length === 0 ? (
-      <p>No expenses yet</p>
-    ) : (
-      activeMonth.expenses!.map((e, i) => (
-        <div
-          key={i}
-          className="grid grid-cols-3 border-b py-2 items-center"
-        >
-          {/* DESCRIPTION + DATE */}
-          <div className="text-left">
-            <div className="font-medium">{e.desc}</div>
-            <div className="text-xs text-gray-500">{e.date}</div>
-          </div>
+                {(activeMonth.expenses || []).length === 0 ? (
+                  <p>No expenses yet</p>
+                ) : (
+                  activeMonth.expenses!.map((e, i) => (
+                    <div
+                      key={i}
+                      className="grid grid-cols-3 border-b py-2 items-center"
+                    >
+                      <div>
+                        <div className="font-medium">{e.desc}</div>
+                        <div className="text-xs text-gray-500">{e.date}</div>
+                      </div>
 
-          {/* AMOUNT */}
-          <div className="text-center font-semibold">
-            {e.amount}
-          </div>
+                      <div className="text-center font-semibold">
+                        {e.amount}
+                      </div>
 
-          {/* ACTIONS */}
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => editExpense(i)}
-              className="text-blue-600 text-sm"
-            >
-              Edit
-            </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => editExpense(i)}
+                          className="text-blue-600 text-sm"
+                        >
+                          Edit
+                        </button>
 
-            <button
-              onClick={() => deleteExpense(i)}
-              className="text-red-600 text-sm"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ))
-    )}
-  </CardContent>
-</Card>
+                        <button
+                          onClick={() => deleteExpense(i)}
+                          className="text-red-600 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
