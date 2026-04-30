@@ -27,6 +27,7 @@ type Expense = {
   desc: string;
   amount: number;
   date: string;
+  category: string; // ✅ NEW
 };
 
 type Month = {
@@ -48,12 +49,15 @@ export default function SalaryApp() {
 
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("Food"); // ✅ NEW
 
   const [monthsData, setMonthsData] = useState<Month[]>([]);
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
 
   const [editId, setEditId] = useState<string | null>(null);
-  const [editExpenseIndex, setEditExpenseIndex] = useState<number | null>(null);
+
+  // expense editing
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   /* ================= AUTH ================= */
 
@@ -146,26 +150,26 @@ export default function SalaryApp() {
 
   /* ================= ADD / UPDATE EXPENSE ================= */
 
-  const addExpense = async () => {
+  const saveExpense = async () => {
     if (!user?.uid || !activeMonth?.id) return;
     if (!desc || !amount) return;
 
     let updated = [...(activeMonth.expenses || [])];
 
-    if (editExpenseIndex !== null) {
-      // UPDATE
-      updated[editExpenseIndex] = {
-        ...updated[editExpenseIndex],
+    if (editingIndex !== null) {
+      // ✅ UPDATE EXISTING (no duplicate)
+      updated[editingIndex] = {
         desc,
         amount: Number(amount),
-        date: updated[editExpenseIndex].date,
+        category,
+        date: new Date().toLocaleDateString(),
       };
-      setEditExpenseIndex(null);
     } else {
-      // ADD NEW
+      // ✅ ADD NEW
       updated.push({
         desc,
         amount: Number(amount),
+        category,
         date: new Date().toLocaleDateString(),
       });
     }
@@ -175,8 +179,11 @@ export default function SalaryApp() {
       { expenses: updated }
     );
 
+    // reset
     setDesc("");
     setAmount("");
+    setCategory("Food");
+    setEditingIndex(null);
   };
 
   /* ================= DELETE EXPENSE ================= */
@@ -204,7 +211,9 @@ export default function SalaryApp() {
 
     setDesc(item.desc);
     setAmount(String(item.amount));
-    setEditExpenseIndex(index);
+    setCategory(item.category || "Food");
+
+    setEditingIndex(index); // ✅ KEY FIX
   };
 
   /* ================= CALC ================= */
@@ -238,12 +247,12 @@ export default function SalaryApp() {
           <CardContent className="p-4">
             <h2 className="font-bold">Month</h2>
 
-            {/* CALENDAR PICKER */}
+            {/* ✅ RESTORED CALENDAR INPUT */}
             <input
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 bg-white text-black"
+              className="w-full border rounded-md px-3 py-2 bg-white"
             />
 
             <Input
@@ -254,7 +263,7 @@ export default function SalaryApp() {
             />
 
             <Button onClick={saveMonth} className="w-full mt-2">
-              {editId ? "Update Month" : "Save Month"}
+              {editId ? "Update" : "Save"}
             </Button>
           </CardContent>
         </Card>
@@ -292,7 +301,7 @@ export default function SalaryApp() {
           </CardContent>
         </Card>
 
-        {/* ACTIVE MONTH */}
+        {/* ACTIVE */}
         {activeMonth && (
           <>
             <Card>
@@ -307,6 +316,7 @@ export default function SalaryApp() {
             {/* EXPENSE FORM */}
             <Card>
               <CardContent className="p-4">
+
                 <Input
                   placeholder="Description"
                   value={desc}
@@ -320,9 +330,24 @@ export default function SalaryApp() {
                   onChange={(e) => setAmount(e.target.value)}
                 />
 
-                <Button onClick={addExpense} className="w-full mt-2">
-                  {editExpenseIndex !== null ? "Update Expense" : "Add Expense"}
+                {/* ✅ CATEGORY SELECT */}
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 mt-2"
+                >
+                  <option>Food</option>
+                  <option>Transport</option>
+                  <option>Fees</option>
+                  <option>Shopping</option>
+                  <option>Rent</option>
+                  <option>Other</option>
+                </select>
+
+                <Button onClick={saveExpense} className="w-full mt-2">
+                  {editingIndex !== null ? "Update Expense" : "Add Expense"}
                 </Button>
+
               </CardContent>
             </Card>
 
@@ -331,41 +356,39 @@ export default function SalaryApp() {
               <CardContent className="p-4">
                 <h2 className="font-bold">History</h2>
 
-                {(activeMonth.expenses || []).length === 0 ? (
-                  <p>No expenses yet</p>
-                ) : (
-                  activeMonth.expenses!.map((e, i) => (
-                    <div
-                      key={i}
-                      className="grid grid-cols-3 border-b py-2 items-center"
-                    >
-                      <div>
-                        <div className="font-medium">{e.desc}</div>
-                        <div className="text-xs text-gray-500">{e.date}</div>
-                      </div>
+                {(activeMonth.expenses || []).map((e, i) => (
+                  <div key={i} className="grid grid-cols-3 border-b py-2">
 
-                      <div className="text-center font-semibold">
-                        {e.amount}
-                      </div>
-
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => editExpense(i)}
-                          className="text-blue-600 text-sm"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          onClick={() => deleteExpense(i)}
-                          className="text-red-600 text-sm"
-                        >
-                          Delete
-                        </button>
+                    <div>
+                      <div>{e.desc}</div>
+                      <div className="text-xs text-gray-500">
+                        {e.category} • {e.date}
                       </div>
                     </div>
-                  ))
-                )}
+
+                    <div className="text-center font-semibold">
+                      {e.amount}
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => editExpense(i)}
+                        className="text-blue-600 text-sm"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => deleteExpense(i)}
+                        className="text-red-600 text-sm"
+                      >
+                        Delete
+                      </button>
+                    </div>
+
+                  </div>
+                ))}
+
               </CardContent>
             </Card>
           </>
