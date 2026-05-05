@@ -1,77 +1,55 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { useRouter } from "next/navigation";
-
+import { db } from "@/lib/firebase";
+import {
+  collection, addDoc, onSnapshot, updateDoc,
+  doc, orderBy, serverTimestamp, deleteDoc, query,
+} from "firebase/firestore";
+import { v4 as uuid } from "uuid";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { ksh, type Month, type Expense, type Category } from "@/lib/utils";
 
-import {
-  collection,
-  addDoc,
-  onSnapshot,
-  updateDoc,
-  doc,
-  orderBy,
-  serverTimestamp,
-  deleteDoc,
-  query,
-} from "firebase/firestore";
+const CATEGORIES: Category[] = ["Needs", "Wants", "Savings"];
 
-/* ================= TYPES ================= */
+const today = () => new Date().toLocaleDateString("en-KE");
 
-type Expense = {
-  desc: string;
-  amount: number;
-  date: string;
-  category: string;
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function StatRow({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+  const isNegative = value < 0;
+  return (
+    <div className="flex justify-between items-center py-1.5 border-b last:border-0">
+      <span className="text-sm text-gray-600">{label}</span>
+      <span className={`text-sm font-semibold ${highlight ? (isNegative ? "text-red-600" : "text-green-600") : "text-gray-800"}`}>
+        {ksh(value)}
+      </span>
+    </div>
+  );
+}
 
-type Month = {
-  id?: string;
-  month?: string;
-  salary?: number;
-  expenses?: Expense[];
-};
+// ─── Main component ───────────────────────────────────────────────────────────
+export default function SalaryPage() {
+  const user = useRequireAuth();
 
-/* ================= COMPONENT ================= */
+  // Month form
+  const [monthInput, setMonthInput] = useState("");
+  const [salaryInput, setSalaryInput] = useState("");
+  const [editMonthId, setEditMonthId] = useState<string | null>(null);
 
-export default function SalaryApp() {
-  const router = useRouter();
-
-  const [user, setUser] = useState<User | null>(null);
-
-  const [month, setMonth] = useState("");
-  const [salary, setSalary] = useState("");
-
+  // Expense form
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState<Category>("Needs");
+  const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
 
-  // ✅ FIXED CATEGORY SYSTEM (MATCHES DASHBOARD)
-  const [category, setCategory] = useState("Needs");
-
+  // Data
   const [monthsData, setMonthsData] = useState<Month[]>([]);
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
 
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-
-  /* ================= AUTH ================= */
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) router.push("/login");
-      else setUser(u);
-    });
-
-    return () => unsub();
-  }, [router]);
-
-  /* ================= LOAD ================= */
-
+  // ─── Load months ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -80,98 +58,79 @@ export default function SalaryApp() {
       orderBy("createdAt", "desc")
     );
 
-    const unsub = onSnapshot(q, (snap) => {
+    return onSnapshot(q, (snap) => {
       const data: Month[] = snap.docs.map((d) => ({
         id: d.id,
-        ...(d.data() as Month),
-        expenses: (d.data() as any).expenses ?? [],
+        ...(d.data() as Omit<Month, "id">),
+        expenses: d.data().expenses ?? [],
       }));
-
       setMonthsData(data);
-
-      if (!activeMonth && data.length > 0) {
-        setActiveMonth(data[0]);
-      }
     });
-
-    return () => unsub();
   }, [user?.uid]);
 
-  /* ================= MONTH SELECT ================= */
+  // ─── Keep activeMonth in sync with live data ──────────────────────────────
+  useEffect(() => {
+    if (!activeMonth?.id) return;
+    const fresh = monthsData.find((m) => m.id === activeMonth.id);
+    if (fresh) setActiveMonth(fresh);
+  }, [monthsData, activeMonth?.id]);
 
-  const selectMonth = (m: Month) => {
-    setActiveMonth((prev) => (prev?.id === m.id ? null : m));
-  };
-
-  /* ================= SAVE MONTH ================= */
-
+  // ─── Month CRUD ───────────────────────────────────────────────────────────
   const saveMonth = async () => {
-    if (!user?.uid) return;
-    if (!month || !salary) return;
+    if (!user?.uid || !monthInput || !salaryInput) return;
 
-    const ref = collection(db, "users", user.uid, "months");
-
-    if (editId) {
-      await updateDoc(doc(db, "users", user.uid, "months", editId), {
-        month,
-        salary: Number(salary),
+    if (editMonthId) {
+      await updateDoc(doc(db, "users", user.uid, "months", editMonthId), {
+        month: monthInput,
+        salary: Number(salaryInput),
       });
-
-      setEditId(null);
+      setEditMonthId(null);
     } else {
-      await addDoc(ref, {
-        month,
-        salary: Number(salary),
+      await addDoc(collection(db, "users", user.uid, "months"), {
+        month: monthInput,
+        salary: Number(salaryInput),
         expenses: [],
         createdAt: serverTimestamp(),
       });
     }
 
-    setMonth("");
-    setSalary("");
+    setMonthInput("");
+    setSalaryInput("");
   };
 
-  /* ================= DELETE MONTH ================= */
+  const startEditMonth = (m: Month) => {
+    setEditMonthId(m.id);
+    setMonthInput(m.month);
+    setSalaryInput(String(m.salary));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const deleteMonth = async (id: string) => {
     if (!user?.uid) return;
-
+    if (!confirm("Delete this month and all its expenses?")) return;
     await deleteDoc(doc(db, "users", user.uid, "months", id));
-
     if (activeMonth?.id === id) setActiveMonth(null);
   };
 
-  /* ================= EDIT MONTH ================= */
+  const selectMonth = (m: Month) =>
+    setActiveMonth((prev) => (prev?.id === m.id ? null : m));
 
-  const startEdit = (m: Month) => {
-    setEditId(m.id || null);
-    setMonth(m.month || "");
-    setSalary(String(m.salary || ""));
-  };
-
-  /* ================= ADD / UPDATE EXPENSE ================= */
-
+  // ─── Expense CRUD ─────────────────────────────────────────────────────────
   const saveExpense = async () => {
-    if (!user?.uid || !activeMonth?.id) return;
-    if (!desc || !amount) return;
+    if (!user?.uid || !activeMonth?.id || !desc || !amount) return;
 
-    let updated = [...(activeMonth.expenses || [])];
+    const expenses = activeMonth.expenses ?? [];
 
-    if (editingIndex !== null) {
-      updated[editingIndex] = {
-        desc,
-        amount: Number(amount),
-        category,
-        date: new Date().toLocaleDateString(),
-      };
-    } else {
-      updated.push({
-        desc,
-        amount: Number(amount),
-        category,
-        date: new Date().toLocaleDateString(),
-      });
-    }
+    const updated = editExpenseId
+      ? expenses.map((e) =>
+          e.id === editExpenseId
+            ? { ...e, desc, amount: Number(amount), category }
+            : e
+        )
+      : [
+          ...expenses,
+          { id: uuid(), desc, amount: Number(amount), category, date: today() },
+        ];
 
     await updateDoc(doc(db, "users", user.uid, "months", activeMonth.id), {
       expenses: updated,
@@ -180,206 +139,263 @@ export default function SalaryApp() {
     setDesc("");
     setAmount("");
     setCategory("Needs");
-    setEditingIndex(null);
+    setEditExpenseId(null);
   };
 
-  /* ================= DELETE EXPENSE ================= */
+  const startEditExpense = (e: Expense) => {
+    setDesc(e.desc);
+    setAmount(String(e.amount));
+    setCategory(e.category);
+    setEditExpenseId(e.id);
+  };
 
-  const deleteExpense = async (index: number) => {
+  const deleteExpense = async (id: string) => {
     if (!user?.uid || !activeMonth?.id) return;
-
-    const updated = (activeMonth.expenses || []).filter(
-      (_, i) => i !== index
-    );
-
+    const updated = (activeMonth.expenses ?? []).filter((e) => e.id !== id);
     await updateDoc(doc(db, "users", user.uid, "months", activeMonth.id), {
       expenses: updated,
     });
   };
 
-  /* ================= EDIT EXPENSE ================= */
-
-  const editExpense = (index: number) => {
-    if (!activeMonth) return;
-
-    const item = activeMonth.expenses?.[index];
-    if (!item) return;
-
-    setDesc(item.desc);
-    setAmount(String(item.amount));
-    setCategory(item.category || "Needs");
-    setEditingIndex(index);
-  };
-
-  /* ================= CALC ================= */
-
+  // ─── Calculations ─────────────────────────────────────────────────────────
   const totalExpenses =
-    activeMonth?.expenses?.reduce(
-      (sum, e) => sum + Number(e.amount || 0),
-      0
-    ) || 0;
-
-  const balance = Number(activeMonth?.salary || 0) - totalExpenses;
+    activeMonth?.expenses?.reduce((s, e) => s + Number(e.amount), 0) ?? 0;
+  const balance = Number(activeMonth?.salary ?? 0) - totalExpenses;
 
   if (!user) return null;
 
-  /* ================= UI ================= */
-
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="relative min-h-screen">
 
+      {/* Background */}
       <div
-        className="fixed inset-0 bg-cover bg-center"
+        className="fixed inset-0 bg-cover bg-center -z-20"
         style={{ backgroundImage: "url('/money-bg.jpg')" }}
       />
+      <div className="fixed inset-0 bg-black/60 -z-10" />
 
-      <div className="fixed inset-0 bg-black/60" />
+      <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-24 text-black">
 
-      <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-40 text-black">
-
-        {/* MONTH FORM */}
+        {/* ── Month form ─────────────────────────────────────────────────── */}
         <Card>
-          <CardContent className="p-4">
-            <h2 className="font-bold">Month</h2>
+          <CardContent className="p-4 grid gap-3">
+            <h2 className="font-bold text-gray-800">
+              {editMonthId ? "Edit Month" : "Add Month"}
+            </h2>
 
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 bg-white"
-            />
+            <div>
+              <label htmlFor="month-input" className="text-xs text-gray-500 mb-1 block">
+                Month
+              </label>
+              <input
+                id="month-input"
+                type="month"
+                value={monthInput}
+                onChange={(e) => setMonthInput(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-            <Input
-              type="number"
-              value={salary}
-              onChange={(e) => setSalary(e.target.value)}
-              placeholder="Salary"
-            />
+            <div>
+              <label htmlFor="salary-input" className="text-xs text-gray-500 mb-1 block">
+                Salary (KES)
+              </label>
+              <Input
+                id="salary-input"
+                type="number"
+                value={salaryInput}
+                onChange={(e) => setSalaryInput(e.target.value)}
+                placeholder="e.g. 50000"
+              />
+            </div>
 
-            <Button onClick={saveMonth} className="w-full mt-2">
-              {editId ? "Update" : "Save"}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={saveMonth} className="flex-1">
+                {editMonthId ? "Update" : "Save Month"}
+              </Button>
+              {editMonthId && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditMonthId(null);
+                    setMonthInput("");
+                    setSalaryInput("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* MONTH LIST */}
+        {/* ── Month list ─────────────────────────────────────────────────── */}
         <Card>
           <CardContent className="p-4">
-            <h2 className="font-bold">Months</h2>
+            <h2 className="font-bold text-gray-800 mb-2">Months</h2>
 
-            {monthsData.map((m) => (
-              <div key={m.id} className="flex justify-between border-b py-2">
+            {monthsData.length === 0 ? (
+              <p className="text-sm text-gray-400 py-2">No months yet. Add one above.</p>
+            ) : (
+              monthsData.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex justify-between items-center border-b py-2 last:border-0 ${
+                    activeMonth?.id === m.id ? "bg-blue-50 -mx-4 px-4 rounded" : ""
+                  }`}
+                >
+                  <button
+                    onClick={() => selectMonth(m)}
+                    className="text-left flex-1"
+                  >
+                    <p className="text-sm font-medium">{m.month}</p>
+                    <p className="text-xs text-gray-500">{ksh(m.salary)}</p>
+                  </button>
 
-                <div onClick={() => selectMonth(m)} className="cursor-pointer">
-                  {m.month} - {m.salary}
+                  <div className="flex gap-2 ml-2">
+                    <button
+                      onClick={() => startEditMonth(m)}
+                      className="text-blue-600 text-xs hover:underline"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteMonth(m.id)}
+                      className="text-red-500 text-xs hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Active month detail ────────────────────────────────────────── */}
+        {activeMonth && (
+          <>
+            {/* Summary */}
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="font-bold text-gray-800 mb-3">{activeMonth.month}</h2>
+                <StatRow label="Salary" value={activeMonth.salary} />
+                <StatRow label="Total expenses" value={totalExpenses} />
+                <StatRow label="Balance" value={balance} highlight />
+              </CardContent>
+            </Card>
+
+            {/* Expense form */}
+            <Card>
+              <CardContent className="p-4 grid gap-3">
+                <h2 className="font-bold text-gray-800">
+                  {editExpenseId ? "Edit Expense" : "Add Expense"}
+                </h2>
+
+                <div>
+                  <label htmlFor="exp-desc" className="text-xs text-gray-500 mb-1 block">
+                    Description
+                  </label>
+                  <Input
+                    id="exp-desc"
+                    placeholder="e.g. Rent"
+                    value={desc}
+                    onChange={(e) => setDesc(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="exp-amount" className="text-xs text-gray-500 mb-1 block">
+                    Amount (KES)
+                  </label>
+                  <Input
+                    id="exp-amount"
+                    type="number"
+                    placeholder="e.g. 15000"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="exp-category" className="text-xs text-gray-500 mb-1 block">
+                    Category
+                  </label>
+                  <select
+                    id="exp-category"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as Category)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => startEdit(m)}
-                    className="text-blue-600 text-sm"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() => deleteMonth(m.id!)}
-                    className="text-red-600 text-sm"
-                  >
-                    Delete
-                  </button>
+                  <Button onClick={saveExpense} className="flex-1">
+                    {editExpenseId ? "Update Expense" : "Add Expense"}
+                  </Button>
+                  {editExpenseId && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditExpenseId(null);
+                        setDesc("");
+                        setAmount("");
+                        setCategory("Needs");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
                 </div>
-
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* ACTIVE MONTH */}
-        {activeMonth && (
-          <>
-            <Card>
-              <CardContent className="p-4">
-                <h2 className="font-bold">{activeMonth.month}</h2>
-                <p>Salary: {activeMonth.salary}</p>
-                <p>Expenses: {totalExpenses}</p>
-                <p className="font-bold">Balance: {balance}</p>
               </CardContent>
             </Card>
 
-            {/* EXPENSE FORM */}
+            {/* Expense history */}
             <Card>
               <CardContent className="p-4">
+                <h2 className="font-bold text-gray-800 mb-2">Expense History</h2>
 
-                <Input
-                  placeholder="Description"
-                  value={desc}
-                  onChange={(e) => setDesc(e.target.value)}
-                />
+                {(activeMonth.expenses ?? []).length === 0 ? (
+                  <p className="text-sm text-gray-400 py-2">No expenses yet.</p>
+                ) : (
+                  (activeMonth.expenses ?? []).map((e, i) => (
+                    <div
+                      key={e.id}
+                      className="flex items-center justify-between border-b py-2 last:border-0 gap-2"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{e.desc}</p>
+                        <p className="text-xs text-gray-500">
+                          {e.category} · {e.date}
+                        </p>
+                      </div>
 
-                <Input
-                  type="number"
-                  placeholder="Amount"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
+                      <span className="text-sm font-semibold text-gray-800 shrink-0">
+                        {ksh(e.amount)}
+                      </span>
 
-                {/* ✅ FIXED CATEGORY SYSTEM */}
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 mt-2"
-                >
-                  <option value="Needs">Needs</option>
-                  <option value="Wants">Wants</option>
-                  <option value="Savings">Savings</option>
-                </select>
-
-                <Button onClick={saveExpense} className="w-full mt-2">
-                  {editingIndex !== null ? "Update Expense" : "Add Expense"}
-                </Button>
-
-              </CardContent>
-            </Card>
-
-            {/* HISTORY */}
-            <Card>
-              <CardContent className="p-4">
-                <h2 className="font-bold">History</h2>
-
-                {(activeMonth.expenses || []).map((e, i) => (
-                  <div key={i} className="grid grid-cols-3 border-b py-2">
-
-                    <div>
-                      <div>{e.desc}</div>
-                      <div className="text-xs text-gray-500">
-                        {e.category} • {e.date}
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => startEditExpense(e)}
+                          className="text-blue-600 text-xs hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteExpense(e.id)}
+                          className="text-red-500 text-xs hover:underline"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
-
-                    <div className="text-center font-semibold">
-                      {e.amount}
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => editExpense(i)}
-                        className="text-blue-600 text-sm"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        onClick={() => deleteExpense(i)}
-                        className="text-red-600 text-sm"
-                      >
-                        Delete
-                      </button>
-                    </div>
-
-                  </div>
-                ))}
-
+                  ))
+                )}
               </CardContent>
             </Card>
           </>

@@ -1,127 +1,105 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { db } from "@/lib/firebase";
+import {
+  collection, addDoc, onSnapshot, updateDoc,
+  doc, query, serverTimestamp, deleteDoc, where,
+} from "firebase/firestore";
+import { v4 as uuid } from "uuid";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { ksh, type Capital, type Sale, type HustleExpense } from "@/lib/utils";
 
-import {
-  collection,
-  addDoc,
-  onSnapshot,
-  updateDoc,
-  doc,
-  query,
-  orderBy,
-  serverTimestamp,
-  deleteDoc,
-  where,
-} from "firebase/firestore";
+const today = () => new Date().toLocaleDateString("en-KE");
 
-import { db, auth } from "@/lib/firebase";
-import { onAuthStateChanged, type User } from "firebase/auth";
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function StatRow({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+}) {
+  const isNegative = value < 0;
+  return (
+    <div className="flex justify-between items-center py-1.5 border-b last:border-0">
+      <span className="text-sm text-gray-600">{label}</span>
+      <span
+        className={`text-sm font-semibold ${
+          highlight
+            ? isNegative
+              ? "text-red-600"
+              : "text-green-600"
+            : "text-gray-800"
+        }`}
+      >
+        {ksh(value)}
+      </span>
+    </div>
+  );
+}
 
-/* ================= TYPES ================= */
-
-type Sale = {
-  buyer: string;
-  amount: number;
-  date: string;
-};
-
-type Expense = {
-  desc: string;
-  amount: number;
-  date: string;
-};
-
-type Capital = {
-  id: string;
-  name: string;
-  capital: number;
-  sales: Sale[];
-  expenses: Expense[];
-  userId?: string;
-};
-
-/* ================= COMPONENT ================= */
-
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function HustlePage() {
-  /* ================= 🔐 LOGIN STATE ================= */
-  const [user, setUser] = useState<User | null>(null);
+  const user = useRequireAuth();
 
+  // Capital form
   const [capitalName, setCapitalName] = useState("");
   const [capitalAmount, setCapitalAmount] = useState("");
   const [editCapitalId, setEditCapitalId] = useState<string | null>(null);
 
+  // Sale form
   const [buyer, setBuyer] = useState("");
-  const [amount, setAmount] = useState("");
-  const [editSaleIndex, setEditSaleIndex] = useState<number | null>(null);
+  const [saleAmount, setSaleAmount] = useState("");
+  const [editSaleId, setEditSaleId] = useState<string | null>(null);
 
+  // Expense form
   const [expDesc, setExpDesc] = useState("");
   const [expAmount, setExpAmount] = useState("");
-  const [editExpIndex, setEditExpIndex] = useState<number | null>(null);
+  const [editExpId, setEditExpId] = useState<string | null>(null);
 
+  // Data
   const [capitals, setCapitals] = useState<Capital[]>([]);
   const [activeCapital, setActiveCapital] = useState<Capital | null>(null);
 
-  /* ================= 🔐 LOGIN FIX ================= */
-
+  // ─── Load hustles ─────────────────────────────────────────────────────────
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) {
-        window.location.href = "/login";
-        return;
-      }
-      setUser(u);
-    });
-
-    return () => unsub();
-  }, []);
-
-  /* ================= LOAD (FIXED - NO INDEX ERROR) ================= */
-
-  useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
 
     const q = query(
       collection(db, "hustleCapitals"),
       where("userId", "==", user.uid)
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const data: Capital[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Capital, "id">),
-        sales: d.data().sales || [],
-        expenses: d.data().expenses || [],
-      }));
-
-      // ✅ FIX: sort in frontend instead of Firestore index
-      data.sort((a: any, b: any) => {
-        const aTime = a.createdAt?.seconds || 0;
-        const bTime = b.createdAt?.seconds || 0;
-        return bTime - aTime;
-      });
+    return onSnapshot(q, (snap) => {
+      const data: Capital[] = snap.docs
+        .map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<Capital, "id">),
+          sales: d.data().sales ?? [],
+          expenses: d.data().expenses ?? [],
+        }))
+        .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
 
       setCapitals(data);
     });
+  }, [user?.uid]);
 
-    return () => unsub();
-  }, [user]);
-
+  // ─── Keep activeCapital in sync ───────────────────────────────────────────
   useEffect(() => {
     if (!activeCapital?.id) return;
-
-    const updated = capitals.find((c) => c.id === activeCapital.id);
-    if (updated) setActiveCapital(updated);
+    const fresh = capitals.find((c) => c.id === activeCapital.id);
+    if (fresh) setActiveCapital(fresh);
   }, [capitals, activeCapital?.id]);
 
-  /* ================= CAPITAL ================= */
-
+  // ─── Capital CRUD ─────────────────────────────────────────────────────────
   const saveCapital = async () => {
-    if (!user) return;
-    if (!capitalName || !capitalAmount) return;
+    if (!user?.uid || !capitalName || !capitalAmount) return;
 
     if (editCapitalId) {
       await updateDoc(doc(db, "hustleCapitals", editCapitalId), {
@@ -144,266 +122,300 @@ export default function HustlePage() {
     setCapitalAmount("");
   };
 
-  const deleteCapital = async (id: string) => {
-    await deleteDoc(doc(db, "hustleCapitals", id));
-    if (activeCapital?.id === id) setActiveCapital(null);
-  };
-
   const startEditCapital = (c: Capital) => {
     setCapitalName(c.name);
     setCapitalAmount(String(c.capital));
     setEditCapitalId(c.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const selectCapital = (c: Capital) => {
-    if (activeCapital?.id === c.id) {
-      setActiveCapital(null);
-    } else {
-      setActiveCapital(c);
-    }
+  const deleteCapital = async (id: string) => {
+    if (!confirm("Delete this hustle and all its data?")) return;
+    await deleteDoc(doc(db, "hustleCapitals", id));
+    if (activeCapital?.id === id) setActiveCapital(null);
   };
 
-  /* ================= SALES ================= */
+  const selectCapital = (c: Capital) =>
+    setActiveCapital((prev) => (prev?.id === c.id ? null : c));
 
+  // ─── Sale CRUD ────────────────────────────────────────────────────────────
   const saveSale = async () => {
-    if (!activeCapital || !buyer || !amount) return;
+    if (!activeCapital || !buyer || !saleAmount) return;
 
-    const list = activeCapital.sales || [];
+    const sales = activeCapital.sales ?? [];
+    const updated = editSaleId
+      ? sales.map((s) =>
+          s.id === editSaleId
+            ? { ...s, buyer, amount: Number(saleAmount) }
+            : s
+        )
+      : [...sales, { id: uuid(), buyer, amount: Number(saleAmount), date: today() }];
 
-    const updated =
-      editSaleIndex !== null
-        ? list.map((s, i) =>
-            i === editSaleIndex
-              ? { ...s, buyer, amount: Number(amount) }
-              : s
-          )
-        : [
-            ...list,
-            {
-              buyer,
-              amount: Number(amount),
-              date: new Date().toLocaleDateString(),
-            },
-          ];
-
-    await updateDoc(doc(db, "hustleCapitals", activeCapital.id), {
-      sales: updated,
-    });
-
+    await updateDoc(doc(db, "hustleCapitals", activeCapital.id), { sales: updated });
     setBuyer("");
-    setAmount("");
-    setEditSaleIndex(null);
+    setSaleAmount("");
+    setEditSaleId(null);
   };
 
-  const editSale = (i: number) => {
-    if (!activeCapital) return;
-    const s = activeCapital.sales[i];
+  const startEditSale = (s: Sale) => {
     setBuyer(s.buyer);
-    setAmount(String(s.amount));
-    setEditSaleIndex(i);
+    setSaleAmount(String(s.amount));
+    setEditSaleId(s.id);
   };
 
-  const deleteSale = async (i: number) => {
+  const deleteSale = async (id: string) => {
     if (!activeCapital) return;
-
-    const updated = activeCapital.sales.filter((_, x) => x !== i);
-
-    await updateDoc(doc(db, "hustleCapitals", activeCapital.id), {
-      sales: updated,
-    });
+    const updated = activeCapital.sales.filter((s) => s.id !== id);
+    await updateDoc(doc(db, "hustleCapitals", activeCapital.id), { sales: updated });
   };
 
-  /* ================= EXPENSE ================= */
-
+  // ─── Expense CRUD ─────────────────────────────────────────────────────────
   const saveExpense = async () => {
     if (!activeCapital || !expDesc || !expAmount) return;
 
-    const list = activeCapital.expenses || [];
+    const expenses = activeCapital.expenses ?? [];
+    const updated = editExpId
+      ? expenses.map((e) =>
+          e.id === editExpId
+            ? { ...e, desc: expDesc, amount: Number(expAmount) }
+            : e
+        )
+      : [...expenses, { id: uuid(), desc: expDesc, amount: Number(expAmount), date: today() }];
 
-    const updated =
-      editExpIndex !== null
-        ? list.map((e, i) =>
-            i === editExpIndex
-              ? { ...e, desc: expDesc, amount: Number(expAmount) }
-              : e
-          )
-        : [
-            ...list,
-            {
-              desc: expDesc,
-              amount: Number(expAmount),
-              date: new Date().toLocaleDateString(),
-            },
-          ];
-
-    await updateDoc(doc(db, "hustleCapitals", activeCapital.id), {
-      expenses: updated,
-    });
-
+    await updateDoc(doc(db, "hustleCapitals", activeCapital.id), { expenses: updated });
     setExpDesc("");
     setExpAmount("");
-    setEditExpIndex(null);
+    setEditExpId(null);
   };
 
-  const editExpense = (i: number) => {
-    if (!activeCapital) return;
-    const e = activeCapital.expenses[i];
+  const startEditExpense = (e: HustleExpense) => {
     setExpDesc(e.desc);
     setExpAmount(String(e.amount));
-    setEditExpIndex(i);
+    setEditExpId(e.id);
   };
 
-  const deleteExpense = async (i: number) => {
+  const deleteExpense = async (id: string) => {
     if (!activeCapital) return;
-
-    const updated = activeCapital.expenses.filter((_, x) => x !== i);
-
-    await updateDoc(doc(db, "hustleCapitals", activeCapital.id), {
-      expenses: updated,
-    });
+    const updated = activeCapital.expenses.filter((e) => e.id !== id);
+    await updateDoc(doc(db, "hustleCapitals", activeCapital.id), { expenses: updated });
   };
 
-  /* ================= CALC ================= */
+  // ─── Calculations ─────────────────────────────────────────────────────────
+  const totalSales = activeCapital?.sales.reduce((s, i) => s + Number(i.amount), 0) ?? 0;
+  const totalExpenses = activeCapital?.expenses.reduce((s, i) => s + Number(i.amount), 0) ?? 0;
+  const capital = activeCapital?.capital ?? 0;
+  const profit = totalSales - totalExpenses - capital;
 
-  const totalSales =
-    activeCapital?.sales.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
+  if (!user) return null;
 
-  const totalExpenses =
-    activeCapital?.expenses.reduce((s, i) => s + Number(i.amount || 0), 0) || 0;
-
-  const net = totalSales - totalExpenses;
-  const capital = activeCapital?.capital || 0;
-
-  const profit = net >= capital ? net - capital : 0;
-  const remaining = capital - net;
-
-  /* ================= UI ================= */
-
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="relative min-h-screen text-black">
 
+      {/* Background */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-20"
         style={{ backgroundImage: "url('/money-bg.jpg')" }}
       />
-
-      <div className="fixed inset-0 bg-black/40 -z-10" />
+      <div className="fixed inset-0 bg-black/60 -z-10" />
 
       <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-24">
 
-        {/* EVERYTHING BELOW UNCHANGED */}
-        {/* (your UI remains exactly the same) */}
+        {/* ── Capital form ───────────────────────────────────────────────── */}
+        <Card>
+          <CardContent className="p-4 grid gap-3">
+            <h2 className="font-bold text-gray-800">
+              {editCapitalId ? "Edit Hustle" : "Add Hustle"}
+            </h2>
 
-        {/* CAPITAL FORM */}
-        <Card className="bg-white border">
-          <CardContent className="p-4">
-            <h2 className="font-bold">Capital</h2>
+            <div>
+              <label htmlFor="cap-name" className="text-xs text-gray-500 mb-1 block">
+                Hustle name
+              </label>
+              <Input
+                id="cap-name"
+                placeholder="e.g. Maize selling"
+                value={capitalName}
+                onChange={(e) => setCapitalName(e.target.value)}
+              />
+            </div>
 
-            <Input
-              placeholder="Name"
-              value={capitalName}
-              onChange={(e) => setCapitalName(e.target.value)}
-            />
+            <div>
+              <label htmlFor="cap-amount" className="text-xs text-gray-500 mb-1 block">
+                Capital invested (KES)
+              </label>
+              <Input
+                id="cap-amount"
+                type="number"
+                placeholder="e.g. 5000"
+                value={capitalAmount}
+                onChange={(e) => setCapitalAmount(e.target.value)}
+              />
+            </div>
 
-            <Input
-              type="number"
-              placeholder="Amount"
-              value={capitalAmount}
-              onChange={(e) => setCapitalAmount(e.target.value)}
-            />
-
-            <Button onClick={saveCapital} className="mt-2 w-full">
-              {editCapitalId ? "Update Capital" : "Save Capital"}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={saveCapital} className="flex-1">
+                {editCapitalId ? "Update" : "Save Hustle"}
+              </Button>
+              {editCapitalId && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditCapitalId(null);
+                    setCapitalName("");
+                    setCapitalAmount("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* CAPITAL LIST */}
-        <Card className="bg-white border">
+        {/* ── Capital list ───────────────────────────────────────────────── */}
+        <Card>
           <CardContent className="p-4">
-            <h2 className="font-bold">Capitals</h2>
+            <h2 className="font-bold text-gray-800 mb-2">My Hustles</h2>
 
-            {capitals.map((c) => (
-              <div key={c.id} className="flex justify-between border-b py-2">
-                <div onClick={() => selectCapital(c)} className="cursor-pointer">
-                  {c.name} - {c.capital}
+            {capitals.length === 0 ? (
+              <p className="text-sm text-gray-400 py-2">No hustles yet. Add one above.</p>
+            ) : (
+              capitals.map((c, i) => (
+                <div
+                  key={c.id}
+                  className={`flex justify-between items-center border-b py-2 last:border-0 ${
+                    activeCapital?.id === c.id ? "bg-indigo-50 -mx-4 px-4 rounded" : ""
+                  }`}
+                >
+                  <button onClick={() => selectCapital(c)} className="text-left flex-1">
+                    <p className="text-sm font-medium">{c.name}</p>
+                    <p className="text-xs text-gray-500">Capital: {ksh(c.capital)}</p>
+                  </button>
+
+                  <div className="flex gap-2 ml-2">
+                    <button
+                      onClick={() => startEditCapital(c)}
+                      className="text-blue-600 text-xs hover:underline"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteCapital(c.id)}
+                      className="text-red-500 text-xs hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Active capital detail ──────────────────────────────────────── */}
+        {activeCapital && (
+          <>
+            {/* Summary */}
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="font-bold text-gray-800 mb-3">{activeCapital.name}</h2>
+                <StatRow label="Capital" value={capital} />
+                <StatRow label="Total sales" value={totalSales} />
+                <StatRow label="Total expenses" value={totalExpenses} />
+                <StatRow
+                  label={profit >= 0 ? "Profit" : "Loss"}
+                  value={profit}
+                  highlight
+                />
+              </CardContent>
+            </Card>
+
+            {/* ── Sales form ───────────────────────────────────────────── */}
+            <Card>
+              <CardContent className="p-4 grid gap-3">
+                <h2 className="font-bold text-gray-800">
+                  {editSaleId ? "Edit Sale" : "Add Sale"}
+                </h2>
+
+                <div>
+                  <label htmlFor="sale-buyer" className="text-xs text-gray-500 mb-1 block">
+                    Buyer name
+                  </label>
+                  <Input
+                    id="sale-buyer"
+                    placeholder="e.g. Jane"
+                    value={buyer}
+                    onChange={(e) => setBuyer(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="sale-amount" className="text-xs text-gray-500 mb-1 block">
+                    Amount (KES)
+                  </label>
+                  <Input
+                    id="sale-amount"
+                    type="number"
+                    placeholder="e.g. 2000"
+                    value={saleAmount}
+                    onChange={(e) => setSaleAmount(e.target.value)}
+                  />
                 </div>
 
                 <div className="flex gap-2">
-                  <button onClick={() => startEditCapital(c)} className="text-blue-600 text-sm">
-                    Edit
-                  </button>
-
-                  <button onClick={() => deleteCapital(c.id)} className="text-red-600 text-sm">
-                    Delete
-                  </button>
+                  <Button onClick={saveSale} className="flex-1">
+                    {editSaleId ? "Update Sale" : "Add Sale"}
+                  </Button>
+                  {editSaleId && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditSaleId(null);
+                        setBuyer("");
+                        setSaleAmount("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* ACTIVE CAPITAL */}
-        {activeCapital && (
-          <>
-            <Card className="bg-white border">
-              <CardContent className="p-4">
-                <h2 className="font-bold">{activeCapital.name}</h2>
-
-                <p>Capital: {capital}</p>
-                <p>Sales: {totalSales}</p>
-                <p>Expenses: {totalExpenses}</p>
-
-                <p className="font-bold">
-                  {net >= capital ? `Profit: ${profit}` : `Remaining: ${remaining}`}
-                </p>
               </CardContent>
             </Card>
 
-            {/* SALES */}
-            <Card className="bg-white border">
+            {/* Sales history */}
+            <Card>
               <CardContent className="p-4">
-                <h2 className="font-bold">Add Sale</h2>
+                <h2 className="font-bold text-gray-800 mb-2">Sales History</h2>
 
-                <Input
-                  placeholder="Buyer"
-                  value={buyer}
-                  onChange={(e) => setBuyer(e.target.value)}
-                />
-
-                <Input
-                  type="number"
-                  placeholder="Amount"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-
-                <Button onClick={saveSale} className="mt-2 w-full">
-                  {editSaleIndex !== null ? "Update Sale" : "Add Sale"}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* SALES HISTORY */}
-            <Card className="bg-white border">
-              <CardContent className="p-4">
-                <h2 className="font-bold">Sales History</h2>
-
-                {(activeCapital.sales || []).length === 0 ? (
-                  <p>No sales yet</p>
+                {activeCapital.sales.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-2">No sales yet.</p>
                 ) : (
                   activeCapital.sales.map((s, i) => (
-                    <div key={i} className="flex justify-between border-b py-1">
-                      <span>
-                        {s.buyer} ({s.date}) - {s.amount}
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between border-b py-2 last:border-0 gap-2"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{s.buyer}</p>
+                        <p className="text-xs text-gray-500">{s.date}</p>
+                      </div>
+
+                      <span className="text-sm font-semibold text-gray-800 shrink-0">
+                        {ksh(s.amount)}
                       </span>
 
-                      <div className="flex gap-2">
-                        <button onClick={() => editSale(i)} className="text-blue-600 text-sm">
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => startEditSale(s)}
+                          className="text-blue-600 text-xs hover:underline"
+                        >
                           Edit
                         </button>
-
-                        <button onClick={() => deleteSale(i)} className="text-red-600 text-sm">
+                        <button
+                          onClick={() => deleteSale(s.id)}
+                          className="text-red-500 text-xs hover:underline"
+                        >
                           Delete
                         </button>
                       </div>
@@ -413,76 +425,99 @@ export default function HustlePage() {
               </CardContent>
             </Card>
 
-            {/* EXPENSES */}
-            <Card className="bg-white border">
-              <CardContent className="p-4">
-                <h2 className="font-bold">Add Expense</h2>
+            {/* ── Expense form ─────────────────────────────────────────── */}
+            <Card>
+              <CardContent className="p-4 grid gap-3">
+                <h2 className="font-bold text-gray-800">
+                  {editExpId ? "Edit Expense" : "Add Expense"}
+                </h2>
 
-                <Input
-                  placeholder="Description"
-                  value={expDesc}
-                  onChange={(e) => setExpDesc(e.target.value)}
-                />
+                <div>
+                  <label htmlFor="exp-desc" className="text-xs text-gray-500 mb-1 block">
+                    Description
+                  </label>
+                  <Input
+                    id="exp-desc"
+                    placeholder="e.g. Transport"
+                    value={expDesc}
+                    onChange={(e) => setExpDesc(e.target.value)}
+                  />
+                </div>
 
-                <Input
-                  type="number"
-                  placeholder="Amount"
-                  value={expAmount}
-                  onChange={(e) => setExpAmount(e.target.value)}
-                />
+                <div>
+                  <label htmlFor="exp-amount" className="text-xs text-gray-500 mb-1 block">
+                    Amount (KES)
+                  </label>
+                  <Input
+                    id="exp-amount"
+                    type="number"
+                    placeholder="e.g. 500"
+                    value={expAmount}
+                    onChange={(e) => setExpAmount(e.target.value)}
+                  />
+                </div>
 
-                <Button onClick={saveExpense} className="mt-2 w-full">
-                  {editExpIndex !== null ? "Update Expense" : "Add Expense"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={saveExpense} className="flex-1">
+                    {editExpId ? "Update Expense" : "Add Expense"}
+                  </Button>
+                  {editExpId && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditExpId(null);
+                        setExpDesc("");
+                        setExpAmount("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
-           {/* EXPENSE HISTORY */}
-<Card className="bg-white border">
-  <CardContent className="p-4">
-    <h2 className="font-bold">Expense History</h2>
+            {/* Expense history */}
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="font-bold text-gray-800 mb-2">Expense History</h2>
 
-    {(activeCapital.expenses || []).length === 0 ? (
-      <p>No expenses yet</p>
-    ) : (
-      activeCapital.expenses.map((e, i) => (
-        <div
-          key={i}
-          className="grid grid-cols-3 items-center border-b py-1"
-        >
-          {/* LEFT */}
-          <div className="text-left">
-            <span>
-              {e.desc} ({e.date})
-            </span>
-          </div>
+                {activeCapital.expenses.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-2">No expenses yet.</p>
+                ) : (
+                  activeCapital.expenses.map((e, i) => (
+                    <div
+                      key={e.id}
+                      className="flex items-center justify-between border-b py-2 last:border-0 gap-2"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{e.desc}</p>
+                        <p className="text-xs text-gray-500">{e.date}</p>
+                      </div>
 
-          {/* MIDDLE (AMOUNT CENTERED) */}
-          <div className="text-center font-semibold">
-            {e.amount}
-          </div>
+                      <span className="text-sm font-semibold text-gray-800 shrink-0">
+                        {ksh(e.amount)}
+                      </span>
 
-          {/* RIGHT (ACTIONS) */}
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => editExpense(i)}
-              className="text-blue-600 text-sm"
-            >
-              Edit
-            </button>
-
-            <button
-              onClick={() => deleteExpense(i)}
-              className="text-red-600 text-sm"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ))
-    )}
-  </CardContent>
-</Card>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => startEditExpense(e)}
+                          className="text-blue-600 text-xs hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteExpense(e.id)}
+                          className="text-red-500 text-xs hover:underline"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           </>
         )}
       </div>

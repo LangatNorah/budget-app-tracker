@@ -1,74 +1,117 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { onSnapshot, collection } from "firebase/firestore";
+import { onSnapshot, collection, query, where } from "firebase/firestore";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { AlertTriangle, LogOut } from "lucide-react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { ksh, type Month, type Capital } from "@/lib/utils";
 
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-} from "recharts";
+// ─── Constants ────────────────────────────────────────────────────────────────
+const BUDGET_RATIOS = { needs: 0.5, wants: 0.3, savings: 0.2 };
+const COLORS = {
+  needs: "#3b82f6",
+  wants: "#f59e0b",
+  savings: "#22c55e",
+  capital: "#6366f1",
+  sales: "#10b981",
+  expenses: "#ef4444",
+  profit: "#22c55e",
+};
 
-import { AlertTriangle } from "lucide-react";
+// ─── Sub-components ───────────────────────────────────────────────────────────
+function BudgetLegendItem({
+  label,
+  color,
+  spent,
+  budget,
+  percent,
+}: {
+  label: string;
+  color: string;
+  spent: number;
+  budget: number;
+  percent: number;
+}) {
+  const isOver = percent > 100;
+  const isWarning = percent > 80;
 
-/* ================= COMPONENT ================= */
+  return (
+    <div
+      className="p-2 rounded-lg"
+      style={{ borderLeft: `4px solid ${color}`, background: `${color}15` }}
+    >
+      <p className="font-medium text-xs">{label}</p>
+      <p className={`text-xs ${isOver ? "text-red-600 font-bold" : isWarning ? "text-yellow-600" : ""}`}>
+        {Math.min(percent, 999).toFixed(0)}% used
+      </p>
+      <p className="text-[10px] text-gray-500">
+        {ksh(spent)} / {ksh(budget)}
+      </p>
+    </div>
+  );
+}
 
+function HustleStat({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <div
+      className="p-2 rounded-lg"
+      style={{ borderLeft: `4px solid ${color}`, background: `${color}15` }}
+    >
+      <p className="text-xs text-gray-600">{label}</p>
+      <p className="text-sm font-semibold">{ksh(value)}</p>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function Home() {
   const router = useRouter();
+  const user = useRequireAuth();
 
-  const [user, setUser] = useState<User | null>(null);
-  const [months, setMonths] = useState<any[]>([]);
-  const [hustles, setHustles] = useState<any[]>([]);
-
-    // ✅ ONLY NEW STATE
+  const [months, setMonths] = useState<Month[]>([]);
+  const [hustles, setHustles] = useState<Capital[]>([]);
   const [showWarning, setShowWarning] = useState(false);
 
-  /* ================= AUTH ================= */
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) router.push("/login");
-      else setUser(u);
-    });
-
-    return () => unsub();
-  }, [router]);
-
-  /* ================= LOGOUT ================= */
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.push("/login");
-  };
-
-  /* ================= DATA ================= */
-
+  // ─── Firestore listeners ───────────────────────────────────────────────────
   useEffect(() => {
     if (!user?.uid) return;
 
-    const monthsRef = collection(db, "users", user.uid, "months");
-    const hustleRef = collection(db, "hustleCapitals");
+    const unsubMonths = onSnapshot(
+      collection(db, "users", user.uid, "months"),
+      (snap) =>
+        setMonths(
+          snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<Month, "id">),
+            expenses: d.data().expenses ?? [],
+          }))
+        )
+    );
 
-    const unsubMonths = onSnapshot(monthsRef, (snap) => {
-      setMonths(
-        snap.docs.map((d) => ({
-          ...(d.data() as any),
-          expenses: (d.data() as any).expenses || [],
-        }))
-      );
-    });
-
-    const unsubHustles = onSnapshot(hustleRef, (snap) => {
-      setHustles(
-        snap.docs
-          .map((d) => ({ id: d.id, ...(d.data() as any) }))
-          .filter((h) => h.userId === user.uid)
-      );
-    });
+    const unsubHustles = onSnapshot(
+      query(collection(db, "hustleCapitals"), where("userId", "==", user.uid)),
+      (snap) =>
+        setHustles(
+          snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<Capital, "id">),
+            sales: d.data().sales ?? [],
+            expenses: d.data().expenses ?? [],
+          }))
+        )
+    );
 
     return () => {
       unsubMonths();
@@ -76,271 +119,170 @@ export default function Home() {
     };
   }, [user?.uid]);
 
-  /* ================= SALARY ================= */
-
-  const salaryTotal = months.reduce(
-    (s, m) => s + Number(m.salary || 0),
-    0
-  );
-
-  const allExpenses = months.flatMap((m) => m.expenses || []);
-
-  /* ================= CATEGORY SPENDING ================= */
+  // ─── Salary calculations ───────────────────────────────────────────────────
+  const salaryTotal = months.reduce((s, m) => s + Number(m.salary || 0), 0);
+  const allExpenses = months.flatMap((m) => m.expenses ?? []);
 
   const needsSpent = allExpenses
-    .filter((e: any) => e.category === "Needs")
-    .reduce((a, e) => a + Number(e.amount || 0), 0);
-
+    .filter((e) => e.category === "Needs")
+    .reduce((a, e) => a + Number(e.amount), 0);
   const wantsSpent = allExpenses
-    .filter((e: any) => e.category === "Wants")
-    .reduce((a, e) => a + Number(e.amount || 0), 0);
-
+    .filter((e) => e.category === "Wants")
+    .reduce((a, e) => a + Number(e.amount), 0);
   const savingsSpent = allExpenses
-    .filter((e: any) => e.category === "Savings")
-    .reduce((a, e) => a + Number(e.amount || 0), 0);
+    .filter((e) => e.category === "Savings")
+    .reduce((a, e) => a + Number(e.amount), 0);
 
-  /* ================= BUDGET (50/30/20) ================= */
+  const needsBudget = salaryTotal * BUDGET_RATIOS.needs;
+  const wantsBudget = salaryTotal * BUDGET_RATIOS.wants;
+  const savingsBudget = salaryTotal * BUDGET_RATIOS.savings;
 
-  const needsBudget = salaryTotal * 0.5;
-  const wantsBudget = salaryTotal * 0.3;
-  const savingsBudget = salaryTotal * 0.2;
+  const needsPct = needsBudget ? (needsSpent / needsBudget) * 100 : 0;
+  const wantsPct = wantsBudget ? (wantsSpent / wantsBudget) * 100 : 0;
+  const savingsPct = savingsBudget ? (savingsSpent / savingsBudget) * 100 : 0;
 
-  /* ================= % DEPLETION ================= */
-
-  const needsPercent = needsBudget
-    ? (needsSpent / needsBudget) * 100
-    : 0;
-
-  const wantsPercent = wantsBudget
-    ? (wantsSpent / wantsBudget) * 100
-    : 0;
-
-  const savingsPercent = savingsBudget
-    ? (savingsSpent / savingsBudget) * 100
-    : 0;
-
-  /* ================= HUSTLE ================= */
-
+  // ─── Hustle calculations ───────────────────────────────────────────────────
   const hustleSales = hustles.reduce(
-    (s, h) =>
-      s +
-      (h.sales || []).reduce(
-        (a: number, x: any) => a + Number(x.amount || 0),
-        0
-      ),
+    (s, h) => s + h.sales.reduce((a, x) => a + Number(x.amount), 0),
     0
   );
-
-  const hustleCapital = hustles.reduce(
-    (s, h) => s + Number(h.capital || 0),
-    0
-  );
-
+  const hustleCapital = hustles.reduce((s, h) => s + Number(h.capital), 0);
   const hustleExpenses = hustles.reduce(
-    (s, h) =>
-      s +
-      (h.expenses || []).reduce(
-        (a: number, e: any) => a + Number(e.amount || 0),
-        0
-      ),
+    (s, h) => s + h.expenses.reduce((a, e) => a + Number(e.amount), 0),
     0
   );
+  const hustleProfit = hustleSales - hustleExpenses - hustleCapital;
 
-  const hustleProfit =
-    hustleSales - hustleCapital - hustleExpenses;
-
-  /* ================= CHART DATA ================= */
-
-  const budgetData = [
-    {
-      name: "Needs",
-      value: Math.max(needsBudget - needsSpent, 0),
-    },
-    {
-      name: "Wants",
-      value: Math.max(wantsBudget - wantsSpent, 0),
-    },
-    {
-      name: "Savings",
-      value: Math.max(savingsBudget - savingsSpent, 0),
-    },
+  // ─── Chart data ────────────────────────────────────────────────────────────
+  const budgetChartData = [
+    { name: "Needs", value: Math.max(needsBudget - needsSpent, 0), color: COLORS.needs },
+    { name: "Wants", value: Math.max(wantsBudget - wantsSpent, 0), color: COLORS.wants },
+    { name: "Savings", value: Math.max(savingsBudget - savingsSpent, 0), color: COLORS.savings },
   ];
 
-  const spentData = [
-    { name: "Needs", value: needsSpent },
-    { name: "Wants", value: wantsSpent },
-    { name: "Savings", value: savingsSpent },
+  const hustleChartData = [
+    { name: "Capital", value: hustleCapital, color: COLORS.capital },
+    { name: "Sales", value: hustleSales, color: COLORS.sales },
+    { name: "Expenses", value: hustleExpenses, color: COLORS.expenses },
+    { name: "Profit", value: Math.max(hustleProfit, 0), color: COLORS.profit },
   ];
 
-  const isLow = needsPercent > 80 || wantsPercent > 80;
+  const isOverspending = needsPct > 80 || wantsPct > 80;
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push("/login");
+  };
 
   if (!user) return null;
 
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="relative min-h-screen">
 
-      {/* BACKGROUND */}
+      {/* Background */}
       <div
-        className="fixed inset-0 bg-cover bg-center"
+        className="fixed inset-0 bg-cover bg-center -z-20"
         style={{ backgroundImage: "url('/money-bg.jpg')" }}
       />
-      <div className="fixed inset-0 bg-black/60" />
+      <div className="fixed inset-0 bg-black/60 -z-10" />
 
       <div className="relative z-10 max-w-6xl mx-auto p-4">
 
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-white text-lg font-semibold">
-            Budget Dashboard
-          </h1>
+        {/* Header */}
+        <header className="flex items-center justify-between mb-6">
+          <h1 className="text-white text-xl font-bold">Budget Dashboard</h1>
 
-          {/* WARNING ICON (ONLY WHEN DANGER) */}
-{isLow && (
-  <button onClick={() => setShowWarning(!showWarning)}>
-    <AlertTriangle className="w-6 h-6 text-red-400 hover:text-red-300 animate-pulse" />
-  </button>
-)}
+          <div className="flex items-center gap-3">
+            {isOverspending && (
+              <button
+                aria-label="Toggle spending warning"
+                onClick={() => setShowWarning((v) => !v)}
+              >
+                <AlertTriangle className="w-6 h-6 text-red-400 hover:text-red-300 animate-pulse" />
+              </button>
+            )}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-4 py-1.5 rounded-full text-sm transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
+        </header>
 
-          <button
-            onClick={handleLogout}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm"
+        {/* Warning banner */}
+        {isOverspending && showWarning && (
+          <div
+            role="alert"
+            aria-live="polite"
+            className="bg-red-500 text-white px-4 py-3 rounded-xl text-sm mb-4 flex items-center gap-2"
           >
-            Logout
-          </button>
-        </div>
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            You are overspending in one or more budget categories.
+          </div>
+        )}
 
-         {/* WARNING CONTENT (TOGGLE ONLY WHEN DANGER) */}
-{isLow && showWarning && (
-  <div className="bg-red-500 text-white p-3 rounded-xl text-sm mb-4">
-    ⚠️ Warning: You are overspending in one or more categories.
-  </div>
-)}
-        {/* 2 COLUMN LAYOUT */}
+        {/* Dashboard grid */}
         <div className="grid md:grid-cols-2 gap-4">
 
-          {/* ================= SALARY ================= */}
-          <div className="bg-white/90 p-5 rounded-2xl">
-
-            <h2 className="text-sm font-semibold text-gray-600 mb-3">
-              💰 Salary Budget (50/30/20)
+          {/* Salary card */}
+          <div className="bg-white/90 backdrop-blur p-5 rounded-2xl">
+            <h2 className="text-sm font-semibold text-gray-600 mb-1">
+              💰 Salary Budget (50 / 30 / 20)
             </h2>
+            <p className="text-xs text-gray-400 mb-3">
+              Total salary: {ksh(salaryTotal)}
+            </p>
 
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-
-                {/* Remaining */}
-                <Pie
-                  data={budgetData}
-                  dataKey="value"
-                  outerRadius={80}
-                  innerRadius={55}
-                >
-                  <Cell fill="#3b82f6" />
-                  <Cell fill="#f59e0b" />
-                  <Cell fill="#22c55e" />
+                <Pie data={budgetChartData} dataKey="value" outerRadius={80} innerRadius={52}>
+                  {budgetChartData.map((d) => (
+                    <Cell key={d.name} fill={d.color} />
+                  ))}
                 </Pie>
-
-                {/* Spent overlay */}
-                <Pie
-                  data={spentData}
-                  dataKey="value"
-                  outerRadius={80}
-                  innerRadius={55}
-                >
-                  <Cell fill="#00000020" />
-                  <Cell fill="#00000020" />
-                  <Cell fill="#00000020" />
-                </Pie>
-
+                <Tooltip formatter={(v) => (typeof v === "number" ? ksh(v) : "")} />
               </PieChart>
             </ResponsiveContainer>
 
-            {/* LEGEND WITH % USED */}
             <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-
-              <div className="border-l-4 border-blue-500 bg-blue-50 p-2 rounded-lg">
-                <p className="font-medium">Needs</p>
-                <p>{needsPercent.toFixed(0)}% used</p>
-                <p className="text-[10px] text-gray-500">
-                  {needsSpent} / {needsBudget}
-                </p>
-              </div>
-
-              <div className="border-l-4 border-yellow-500 bg-yellow-50 p-2 rounded-lg">
-                <p className="font-medium">Wants</p>
-                <p>{wantsPercent.toFixed(0)}% used</p>
-                <p className="text-[10px] text-gray-500">
-                  {wantsSpent} / {wantsBudget}
-                </p>
-              </div>
-
-              <div className="border-l-4 border-green-500 bg-green-50 p-2 rounded-lg">
-                <p className="font-medium">Savings</p>
-                <p>{savingsPercent.toFixed(0)}% used</p>
-                <p className="text-[10px] text-gray-500">
-                  {savingsSpent} / {savingsBudget}
-                </p>
-              </div>
-
+              <BudgetLegendItem label="Needs" color={COLORS.needs} spent={needsSpent} budget={needsBudget} percent={needsPct} />
+              <BudgetLegendItem label="Wants" color={COLORS.wants} spent={wantsSpent} budget={wantsBudget} percent={wantsPct} />
+              <BudgetLegendItem label="Savings" color={COLORS.savings} spent={savingsSpent} budget={savingsBudget} percent={savingsPct} />
             </div>
           </div>
 
-          {/* ================= HUSTLE ================= */}
-          <div className="bg-white/90 p-5 rounded-2xl">
-
-            <h2 className="text-sm font-semibold text-gray-600 mb-3">
+          {/* Hustle card */}
+          <div className="bg-white/90 backdrop-blur p-5 rounded-2xl">
+            <h2 className="text-sm font-semibold text-gray-600 mb-1">
               💼 Hustle Performance
             </h2>
+            <p className={`text-xs mb-3 font-medium ${hustleProfit >= 0 ? "text-green-600" : "text-red-500"}`}>
+              {hustleProfit >= 0 ? `Profit: ${ksh(hustleProfit)}` : `Loss: ${ksh(Math.abs(hustleProfit))}`}
+            </p>
 
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie
-                  data={[
-                    { name: "Capital", value: hustleCapital },
-                    { name: "Sales", value: hustleSales },
-                    { name: "Expenses", value: hustleExpenses },
-                    { name: "Profit", value: hustleProfit > 0 ? hustleProfit : 0 },
-                  ]}
-                  dataKey="value"
-                  outerRadius={80}
-                  innerRadius={50}
-                >
-                  <Cell fill="#6366f1" />
-                  <Cell fill="#10b981" />
-                  <Cell fill="#ef4444" />
-                  <Cell fill="#22c55e" />
+                <Pie data={hustleChartData} dataKey="value" outerRadius={80} innerRadius={52}>
+                  {hustleChartData.map((d) => (
+                    <Cell key={d.name} fill={d.color} />
+                  ))}
                 </Pie>
+               <Tooltip formatter={(v) => (typeof v === "number" ? ksh(v) : "")} />
               </PieChart>
             </ResponsiveContainer>
 
-            {/* HUSTLE BOXES */}
-            <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-
-              <div className="border-l-4 border-indigo-500 bg-indigo-50 p-2 rounded-lg">
-                <p>Capital</p>
-                <p>{hustleCapital}</p>
-              </div>
-
-              <div className="border-l-4 border-green-500 bg-green-50 p-2 rounded-lg">
-                <p>Sales</p>
-                <p>{hustleSales}</p>
-              </div>
-
-              <div className="border-l-4 border-red-500 bg-red-50 p-2 rounded-lg">
-                <p>Expenses</p>
-                <p>{hustleExpenses}</p>
-              </div>
-
-              <div className="border-l-4 border-emerald-500 bg-emerald-50 p-2 rounded-lg">
-                <p>Profit</p>
-                <p>{hustleProfit}</p>
-              </div>
-
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <HustleStat label="Capital" value={hustleCapital} color={COLORS.capital} />
+              <HustleStat label="Sales" value={hustleSales} color={COLORS.sales} />
+              <HustleStat label="Expenses" value={hustleExpenses} color={COLORS.expenses} />
+              <HustleStat label="Profit / Loss" value={hustleProfit} color={hustleProfit >= 0 ? COLORS.profit : COLORS.expenses} />
             </div>
           </div>
-        </div>
 
-       
+        </div>
       </div>
     </div>
   );

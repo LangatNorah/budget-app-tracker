@@ -5,128 +5,158 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
 } from "firebase/auth";
-
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
+// ─── Friendly error messages ──────────────────────────────────────────────────
+const AUTH_ERRORS: Record<string, string> = {
+  "auth/user-not-found": "No account found with that email.",
+  "auth/wrong-password": "Incorrect password. Please try again.",
+  "auth/email-already-in-use": "An account with this email already exists.",
+  "auth/weak-password": "Password must be at least 6 characters.",
+  "auth/invalid-email": "Please enter a valid email address.",
+  "auth/too-many-requests": "Too many attempts. Please try again later.",
+};
+
 export default function AuthPage() {
+  const router = useRouter();
+
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const router = useRouter();
 
   const handleAuth = async () => {
     setError("");
 
-    if (!email || !password) {
-      setError("Fill all fields");
+    if (!email.trim() || !password.trim()) {
+      setError("Please fill in all fields.");
       return;
     }
 
     try {
       setLoading(true);
 
-      let userCredential;
-
-      // 🔐 LOGIN
       if (isLogin) {
-        userCredential = await signInWithEmailAndPassword(
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        const { user } = await createUserWithEmailAndPassword(
           auth,
           email,
           password
         );
-      }
-
-      // 🆕 REGISTER
-      else {
-        userCredential = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-
-        const user = userCredential.user;
-
-        // 🔥 IMPORTANT: create Firestore user doc
         await setDoc(doc(db, "users", user.uid), {
           email: user.email,
           createdAt: serverTimestamp(),
         });
       }
 
-      // 🚀 redirect
       router.push("/");
     } catch (err: any) {
-      setError(err.message || "Authentication failed");
+      setError(AUTH_ERRORS[err.code] ?? "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="relative min-h-screen">
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleAuth();
+  };
 
+  return (
+    <div className="relative min-h-screen flex items-center justify-center">
+
+      {/* Background */}
       <div
         className="fixed inset-0 bg-cover bg-center -z-20"
         style={{ backgroundImage: "url('/money-bg.jpg')" }}
       />
-
       <div className="fixed inset-0 bg-black/60 -z-10" />
 
-      <div className="relative z-10 p-4 max-w-md mx-auto flex flex-col justify-center min-h-screen text-black">
+      {/* Card */}
+      <div className="w-full max-w-sm mx-4 bg-white rounded-2xl shadow-lg p-8">
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <h1 className="text-2xl font-bold text-center text-gray-800 mb-1">
+          {isLogin ? "Welcome back" : "Create account"}
+        </h1>
+        <p className="text-sm text-center text-gray-500 mb-6">
+          {isLogin
+            ? "Sign in to your budget dashboard"
+            : "Start tracking your money today"}
+        </p>
 
-          <h1 className="text-xl font-bold mb-4 text-center">
-            {isLogin ? "Login" : "Create Account"}
-          </h1>
+        <div className="grid gap-3">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="you@example.com"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-          <input
-            className="border p-2 w-full mb-2 rounded"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-
-          <input
-            className="border p-2 w-full mb-2 rounded"
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete={isLogin ? "current-password" : "new-password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="••••••••"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
           {error && (
-            <p className="text-red-500 text-sm mb-2">{error}</p>
+            <p role="alert" className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </p>
           )}
 
           <button
             onClick={handleAuth}
             disabled={loading}
-            className="bg-black text-white w-full p-2 rounded"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium rounded-lg py-2.5 text-sm transition-colors mt-1"
           >
             {loading
-              ? "Processing..."
+              ? "Please wait…"
               : isLogin
-              ? "Login"
-              : "Register"}
+              ? "Sign in"
+              : "Create account"}
           </button>
-
-          <p className="text-center mt-4 text-sm">
-            {isLogin ? "No account?" : "Already have an account?"}{" "}
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-blue-600"
-            >
-              {isLogin ? "Register" : "Login"}
-            </button>
-          </p>
-
         </div>
+
+        <p className="text-center text-sm text-gray-500 mt-6">
+          {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+          <button
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError("");
+            }}
+            className="text-blue-600 font-medium hover:underline"
+          >
+            {isLogin ? "Register" : "Sign in"}
+          </button>
+        </p>
       </div>
     </div>
   );
