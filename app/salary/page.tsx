@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection, addDoc, onSnapshot, updateDoc,
@@ -10,14 +10,14 @@ import { v4 as uuid } from "uuid";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp, History } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { ksh, type Month, type Expense, type Category } from "@/lib/utils";
 
 const CATEGORIES: Category[] = ["Needs", "Wants", "Savings"];
-
 const today = () => new Date().toLocaleDateString("en-KE");
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Stat row ─────────────────────────────────────────────────────────────────
 function StatRow({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   const isNegative = value < 0;
   return (
@@ -34,6 +34,10 @@ function StatRow({ label, value, highlight }: { label: string; value: number; hi
 export default function SalaryPage() {
   const user = useRequireAuth();
 
+  // Refs for scrolling
+  const monthFormRef = useRef<HTMLDivElement>(null);
+  const expenseFormRef = useRef<HTMLDivElement>(null);
+
   // Month form
   const [monthInput, setMonthInput] = useState("");
   const [salaryInput, setSalaryInput] = useState("");
@@ -48,16 +52,15 @@ export default function SalaryPage() {
   // Data
   const [monthsData, setMonthsData] = useState<Month[]>([]);
   const [activeMonth, setActiveMonth] = useState<Month | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   // ─── Load months ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user?.uid) return;
-
     const q = query(
       collection(db, "users", user.uid, "months"),
       orderBy("createdAt", "desc")
     );
-
     return onSnapshot(q, (snap) => {
       const data: Month[] = snap.docs.map((d) => ({
         id: d.id,
@@ -68,7 +71,7 @@ export default function SalaryPage() {
     });
   }, [user?.uid]);
 
-  // ─── Keep activeMonth in sync with live data ──────────────────────────────
+  // ─── Keep activeMonth in sync ─────────────────────────────────────────────
   useEffect(() => {
     if (!activeMonth?.id) return;
     const fresh = monthsData.find((m) => m.id === activeMonth.id);
@@ -78,7 +81,6 @@ export default function SalaryPage() {
   // ─── Month CRUD ───────────────────────────────────────────────────────────
   const saveMonth = async () => {
     if (!user?.uid || !monthInput || !salaryInput) return;
-
     if (editMonthId) {
       await updateDoc(doc(db, "users", user.uid, "months", editMonthId), {
         month: monthInput,
@@ -93,7 +95,6 @@ export default function SalaryPage() {
         createdAt: serverTimestamp(),
       });
     }
-
     setMonthInput("");
     setSalaryInput("");
   };
@@ -102,7 +103,7 @@ export default function SalaryPage() {
     setEditMonthId(m.id);
     setMonthInput(m.month);
     setSalaryInput(String(m.salary));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => monthFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const deleteMonth = async (id: string) => {
@@ -118,24 +119,16 @@ export default function SalaryPage() {
   // ─── Expense CRUD ─────────────────────────────────────────────────────────
   const saveExpense = async () => {
     if (!user?.uid || !activeMonth?.id || !desc || !amount) return;
-
     const expenses = activeMonth.expenses ?? [];
-
     const updated = editExpenseId
       ? expenses.map((e) =>
           e.id === editExpenseId
             ? { ...e, desc, amount: Number(amount), category }
             : e
         )
-      : [
-          ...expenses,
-          { id: uuid(), desc, amount: Number(amount), category, date: today() },
-        ];
+      : [...expenses, { id: uuid(), desc, amount: Number(amount), category, date: today() }];
 
-    await updateDoc(doc(db, "users", user.uid, "months", activeMonth.id), {
-      expenses: updated,
-    });
-
+    await updateDoc(doc(db, "users", user.uid, "months", activeMonth.id), { expenses: updated });
     setDesc("");
     setAmount("");
     setCategory("Needs");
@@ -147,19 +140,17 @@ export default function SalaryPage() {
     setAmount(String(e.amount));
     setCategory(e.category);
     setEditExpenseId(e.id);
+    setTimeout(() => expenseFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const deleteExpense = async (id: string) => {
     if (!user?.uid || !activeMonth?.id) return;
     const updated = (activeMonth.expenses ?? []).filter((e) => e.id !== id);
-    await updateDoc(doc(db, "users", user.uid, "months", activeMonth.id), {
-      expenses: updated,
-    });
+    await updateDoc(doc(db, "users", user.uid, "months", activeMonth.id), { expenses: updated });
   };
 
   // ─── Calculations ─────────────────────────────────────────────────────────
-  const totalExpenses =
-    activeMonth?.expenses?.reduce((s, e) => s + Number(e.amount), 0) ?? 0;
+  const totalExpenses = activeMonth?.expenses?.reduce((s, e) => s + Number(e.amount), 0) ?? 0;
   const balance = Number(activeMonth?.salary ?? 0) - totalExpenses;
 
   if (!user) return null;
@@ -167,108 +158,106 @@ export default function SalaryPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="relative min-h-screen">
-
-      {/* Background */}
-      <div
-        className="fixed inset-0 bg-cover bg-center -z-20"
-        style={{ backgroundImage: "url('/money-bg.jpg')" }}
-      />
+      <div className="fixed inset-0 bg-cover bg-center -z-20" style={{ backgroundImage: "url('/money-bg.jpg')" }} />
       <div className="fixed inset-0 bg-black/60 -z-10" />
 
       <div className="relative z-10 p-4 max-w-md mx-auto grid gap-4 pb-24 text-black">
 
         {/* ── Month form ─────────────────────────────────────────────────── */}
-        <Card>
-          <CardContent className="p-4 grid gap-3">
-            <h2 className="font-bold text-gray-800">
-              {editMonthId ? "Edit Month" : "Add Month"}
-            </h2>
+        <div ref={monthFormRef}>
+          <Card>
+            <CardContent className="p-4 grid gap-3">
+              <h2 className="font-bold text-gray-800">
+                {editMonthId ? "✏️ Edit Month" : "➕ Add Month"}
+              </h2>
 
-            <div>
-              <label htmlFor="month-input" className="text-xs text-gray-500 mb-1 block">
-                Month
-              </label>
-              <input
-                id="month-input"
-                type="month"
-                value={monthInput}
-                onChange={(e) => setMonthInput(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+              <div>
+                <label htmlFor="month-input" className="text-xs text-gray-500 mb-1 block">Month</label>
+                <input
+                  id="month-input"
+                  type="month"
+                  value={monthInput}
+                  onChange={(e) => setMonthInput(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
-            <div>
-              <label htmlFor="salary-input" className="text-xs text-gray-500 mb-1 block">
-                Salary (KES)
-              </label>
-              <Input
-                id="salary-input"
-                type="number"
-                value={salaryInput}
-                onChange={(e) => setSalaryInput(e.target.value)}
-                placeholder="e.g. 50000"
-              />
-            </div>
+              <div>
+                <label htmlFor="salary-input" className="text-xs text-gray-500 mb-1 block">Salary (KES)</label>
+                <Input
+                  id="salary-input"
+                  type="number"
+                  value={salaryInput}
+                  onChange={(e) => setSalaryInput(e.target.value)}
+                  placeholder="e.g. 50000"
+                />
+              </div>
 
-            <div className="flex gap-2">
-              <Button onClick={saveMonth} className="flex-1">
-                {editMonthId ? "Update" : "Save Month"}
-              </Button>
-              {editMonthId && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setEditMonthId(null);
-                    setMonthInput("");
-                    setSalaryInput("");
-                  }}
-                >
-                  Cancel
+              <div className="flex gap-2">
+                <Button onClick={saveMonth} className="flex-1">
+                  {editMonthId ? "Update Month" : "Save Month"}
                 </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                {editMonthId && (
+                  <Button variant="outline" onClick={() => { setEditMonthId(null); setMonthInput(""); setSalaryInput(""); }}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* ── Month list ─────────────────────────────────────────────────── */}
         <Card>
           <CardContent className="p-4">
-            <h2 className="font-bold text-gray-800 mb-2">Months</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-bold text-gray-800">Months</h2>
+              {monthsData.length > 0 && (
+                <span className="text-xs text-gray-400 italic">Tap a month to view details</span>
+              )}
+            </div>
 
             {monthsData.length === 0 ? (
               <p className="text-sm text-gray-400 py-2">No months yet. Add one above.</p>
             ) : (
-              monthsData.map((m) => (
-                <div
-                  key={m.id}
-                  className={`flex justify-between items-center border-b py-2 last:border-0 ${
-                    activeMonth?.id === m.id ? "bg-blue-50 -mx-4 px-4 rounded" : ""
-                  }`}
-                >
-                  <button
-                    onClick={() => selectMonth(m)}
-                    className="text-left flex-1"
+              monthsData.map((m) => {
+                const isActive = activeMonth?.id === m.id;
+                return (
+                  <div
+                    key={m.id}
+                    className={`border-b last:border-0 transition-colors ${isActive ? "bg-blue-50 -mx-4 px-4" : ""}`}
                   >
-                    <p className="text-sm font-medium">{m.month}</p>
-                    <p className="text-xs text-gray-500">{ksh(m.salary)}</p>
-                  </button>
+                    {/* Clickable row */}
+                    <button
+                      onClick={() => selectMonth(m)}
+                      className="w-full flex items-center justify-between py-2.5 text-left gap-2"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{m.month}</p>
+                        <p className="text-xs text-gray-500">{ksh(m.salary)}</p>
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-400">
+                        <span className="text-xs">{isActive ? "collapse" : "expand"}</span>
+                        {isActive
+                          ? <ChevronUp className="w-4 h-4" />
+                          : <ChevronDown className="w-4 h-4" />}
+                      </div>
+                    </button>
 
-                  <div className="flex gap-2 ml-2">
-                    <button
-                      onClick={() => startEditMonth(m)}
-                      className="text-blue-600 text-xs hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => deleteMonth(m.id)}
-                      className="text-red-500 text-xs hover:underline"
-                    >
-                      Delete
-                    </button>
+                    {/* Edit / Delete — shown when active */}
+                    {isActive && (
+                      <div className="flex gap-3 pb-2.5 pl-1">
+                        <button onClick={() => startEditMonth(m)} className="text-blue-600 text-xs font-medium hover:underline">
+                          ✏️ Edit
+                        </button>
+                        <button onClick={() => deleteMonth(m.id)} className="text-red-500 text-xs font-medium hover:underline">
+                          🗑️ Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </CardContent>
         </Card>
@@ -279,7 +268,7 @@ export default function SalaryPage() {
             {/* Summary */}
             <Card>
               <CardContent className="p-4">
-                <h2 className="font-bold text-gray-800 mb-3">{activeMonth.month}</h2>
+                <h2 className="font-bold text-gray-800 mb-3">📅 {activeMonth.month}</h2>
                 <StatRow label="Salary" value={activeMonth.salary} />
                 <StatRow label="Total expenses" value={totalExpenses} />
                 <StatRow label="Balance" value={balance} highlight />
@@ -287,114 +276,95 @@ export default function SalaryPage() {
             </Card>
 
             {/* Expense form */}
-            <Card>
-              <CardContent className="p-4 grid gap-3">
-                <h2 className="font-bold text-gray-800">
-                  {editExpenseId ? "Edit Expense" : "Add Expense"}
-                </h2>
+            <div ref={expenseFormRef}>
+              <Card>
+                <CardContent className="p-4 grid gap-3">
+                  <h2 className="font-bold text-gray-800">
+                    {editExpenseId ? "✏️ Edit Expense" : "➕ Add Expense"}
+                  </h2>
 
-                <div>
-                  <label htmlFor="exp-desc" className="text-xs text-gray-500 mb-1 block">
-                    Description
-                  </label>
-                  <Input
-                    id="exp-desc"
-                    placeholder="e.g. Rent"
-                    value={desc}
-                    onChange={(e) => setDesc(e.target.value)}
-                  />
-                </div>
+                  <div>
+                    <label htmlFor="exp-desc" className="text-xs text-gray-500 mb-1 block">Description</label>
+                    <Input id="exp-desc" placeholder="e.g. Rent" value={desc} onChange={(e) => setDesc(e.target.value)} />
+                  </div>
 
-                <div>
-                  <label htmlFor="exp-amount" className="text-xs text-gray-500 mb-1 block">
-                    Amount (KES)
-                  </label>
-                  <Input
-                    id="exp-amount"
-                    type="number"
-                    placeholder="e.g. 15000"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
-                </div>
+                  <div>
+                    <label htmlFor="exp-amount" className="text-xs text-gray-500 mb-1 block">Amount (KES)</label>
+                    <Input id="exp-amount" type="number" placeholder="e.g. 15000" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                  </div>
 
-                <div>
-                  <label htmlFor="exp-category" className="text-xs text-gray-500 mb-1 block">
-                    Category
-                  </label>
-                  <select
-                    id="exp-category"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as Category)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button onClick={saveExpense} className="flex-1">
-                    {editExpenseId ? "Update Expense" : "Add Expense"}
-                  </Button>
-                  {editExpenseId && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setEditExpenseId(null);
-                        setDesc("");
-                        setAmount("");
-                        setCategory("Needs");
-                      }}
+                  <div>
+                    <label htmlFor="exp-category" className="text-xs text-gray-500 mb-1 block">Category</label>
+                    <select
+                      id="exp-category"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value as Category)}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      Cancel
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                      {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
 
-            {/* Expense history */}
+                  <div className="flex gap-2">
+                    <Button onClick={saveExpense} className="flex-1">
+                      {editExpenseId ? "Update Expense" : "Add Expense"}
+                    </Button>
+                    {editExpenseId && (
+                      <Button variant="outline" onClick={() => { setEditExpenseId(null); setDesc(""); setAmount(""); setCategory("Needs"); }}>
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Expense history — single toggle */}
             <Card>
               <CardContent className="p-4">
-                <h2 className="font-bold text-gray-800 mb-2">Expense History</h2>
+                {/* Header is the toggle */}
+                <button
+                  onClick={() => setShowHistory((v) => !v)}
+                  className="w-full flex items-center justify-between mb-1"
+                >
+                  <div className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-gray-500" />
+                    <h2 className="font-bold text-gray-800">Expense History</h2>
+                    {(activeMonth.expenses ?? []).length > 0 && (
+                      <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">
+                        {(activeMonth.expenses ?? []).length}
+                      </span>
+                    )}
+                  </div>
+                  {showHistory
+                    ? <ChevronUp className="w-4 h-4 text-gray-400" />
+                    : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                </button>
 
-                {(activeMonth.expenses ?? []).length === 0 ? (
+                {!showHistory ? (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {(activeMonth.expenses ?? []).length === 0
+                      ? "No expenses yet."
+                      : `${(activeMonth.expenses ?? []).length} expense(s) — tap to view`}
+                  </p>
+                ) : (activeMonth.expenses ?? []).length === 0 ? (
                   <p className="text-sm text-gray-400 py-2">No expenses yet.</p>
                 ) : (
-                  (activeMonth.expenses ?? []).map((e, i) => (
-                    <div
-                      key={e.id}
-                      className="flex items-center justify-between border-b py-2 last:border-0 gap-2"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{e.desc}</p>
-                        <p className="text-xs text-gray-500">
-                          {e.category} · {e.date}
-                        </p>
+                  <div className="mt-2">
+                    {(activeMonth.expenses ?? []).map((e, i) => (
+                      <div key={e.id ?? i} className="flex items-center justify-between border-b last:border-0 py-2 gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{e.desc}</p>
+                          <p className="text-xs text-gray-400">{e.category} · {e.date}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-800 shrink-0">{ksh(e.amount)}</span>
+                        <div className="flex gap-2 shrink-0">
+                          <button onClick={() => startEditExpense(e)} className="text-blue-600 text-xs hover:underline">✏️</button>
+                          <button onClick={() => deleteExpense(e.id)} className="text-red-500 text-xs hover:underline">🗑️</button>
+                        </div>
                       </div>
-
-                      <span className="text-sm font-semibold text-gray-800 shrink-0">
-                        {ksh(e.amount)}
-                      </span>
-
-                      <div className="flex gap-2 shrink-0">
-                        <button
-                          onClick={() => startEditExpense(e)}
-                          className="text-blue-600 text-xs hover:underline"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteExpense(e.id)}
-                          className="text-red-500 text-xs hover:underline"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
