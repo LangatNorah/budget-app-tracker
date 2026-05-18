@@ -10,11 +10,17 @@ import { v4 as uuid } from "uuid";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, History } from "lucide-react";
+import { ChevronDown, ChevronUp, History, Clock, Pencil } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { ksh, type Capital, type Sale, type HustleExpense } from "@/lib/utils";
 
 const today = () => new Date().toLocaleDateString("en-KE");
+const nowStamp = () => new Date().toISOString();
+const formatStamp = (iso: string) =>
+  new Date(iso).toLocaleString("en-KE", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  });
 
 // ─── Stat row ─────────────────────────────────────────────────────────────────
 function StatRow({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
@@ -129,22 +135,20 @@ export default function HustlePage() {
 
     let updated: Sale[];
     if (editSaleId) {
-      // Match by id if present, fallback to same object reference
       updated = sales.map((s) =>
         (s.id && s.id === editSaleId)
-          ? { ...s, buyer, amount: Number(saleAmount) }
+          ? { ...s, buyer, amount: Number(saleAmount), editedAt: nowStamp() }
           : s
       );
-      // If no id matched (old data without uuid), match by editSaleId used as index string
       if (!updated.some((s) => s.buyer === buyer)) {
         updated = sales.map((s, i) =>
           String(i) === editSaleId
-            ? { ...s, id: uuid(), buyer, amount: Number(saleAmount) }
+            ? { ...s, id: uuid(), buyer, amount: Number(saleAmount), editedAt: nowStamp() }
             : s
         );
       }
     } else {
-      updated = [...sales, { id: uuid(), buyer, amount: Number(saleAmount), date: today() }];
+      updated = [...sales, { id: uuid(), buyer, amount: Number(saleAmount), date: today(), createdAt: nowStamp() }];
     }
 
     await updateDoc(doc(db, "hustleCapitals", activeCapital.id), { sales: updated });
@@ -156,7 +160,6 @@ export default function HustlePage() {
   const startEditSale = (s: Sale, index: number) => {
     setBuyer(s.buyer);
     setSaleAmount(String(s.amount));
-    // Use uuid id if present, otherwise use index as fallback identifier
     setEditSaleId(s.id ?? String(index));
     setTimeout(() => saleFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
@@ -176,10 +179,10 @@ export default function HustlePage() {
     const updated = editExpId
       ? expenses.map((e) =>
           e.id === editExpId
-            ? { ...e, desc: expDesc, amount: Number(expAmount) }
+            ? { ...e, desc: expDesc, amount: Number(expAmount), editedAt: nowStamp() }
             : e
         )
-      : [...expenses, { id: uuid(), desc: expDesc, amount: Number(expAmount), date: today() }];
+      : [...expenses, { id: uuid(), desc: expDesc, amount: Number(expAmount), date: today(), createdAt: nowStamp() }];
 
     await updateDoc(doc(db, "hustleCapitals", activeCapital.id), { expenses: updated });
     setExpDesc("");
@@ -368,10 +371,23 @@ export default function HustlePage() {
                 ) : (
                   <div className="mt-2">
                     {activeCapital.sales.map((s, i) => (
-                      <div key={s.id ?? i} className="flex items-center justify-between border-b last:border-0 py-2 gap-2">
+                      <div key={s.id ?? i} className="flex items-start justify-between border-b last:border-0 py-2 gap-2">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{s.buyer}</p>
                           <p className="text-xs text-gray-400">{s.date}</p>
+                          {/* ── Timestamps ── */}
+                          {(s as any).createdAt && (
+                            <span className="flex items-center gap-1 text-[10px] text-gray-400 mt-0.5">
+                              <Clock className="w-2.5 h-2.5 shrink-0" />
+                              Added {formatStamp((s as any).createdAt)}
+                            </span>
+                          )}
+                          {(s as any).editedAt && (
+                            <span className="flex items-center gap-1 text-[10px] text-blue-400">
+                              <Pencil className="w-2.5 h-2.5 shrink-0" />
+                              Edited {formatStamp((s as any).editedAt)}
+                            </span>
+                          )}
                         </div>
                         <span className="text-sm font-semibold text-gray-800 shrink-0">{ksh(s.amount)}</span>
                         <div className="flex gap-2 shrink-0">
@@ -447,10 +463,23 @@ export default function HustlePage() {
                 ) : (
                   <div className="mt-2">
                     {activeCapital.expenses.map((e, i) => (
-                      <div key={e.id ?? i} className="flex items-center justify-between border-b last:border-0 py-2 gap-2">
+                      <div key={e.id ?? i} className="flex items-start justify-between border-b last:border-0 py-2 gap-2">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{e.desc}</p>
                           <p className="text-xs text-gray-400">{e.date}</p>
+                          {/* ── Timestamps ── */}
+                          {(e as any).createdAt && (
+                            <span className="flex items-center gap-1 text-[10px] text-gray-400 mt-0.5">
+                              <Clock className="w-2.5 h-2.5 shrink-0" />
+                              Added {formatStamp((e as any).createdAt)}
+                            </span>
+                          )}
+                          {(e as any).editedAt && (
+                            <span className="flex items-center gap-1 text-[10px] text-blue-400">
+                              <Pencil className="w-2.5 h-2.5 shrink-0" />
+                              Edited {formatStamp((e as any).editedAt)}
+                            </span>
+                          )}
                         </div>
                         <span className="text-sm font-semibold text-gray-800 shrink-0">{ksh(e.amount)}</span>
                         <div className="flex gap-2 shrink-0">

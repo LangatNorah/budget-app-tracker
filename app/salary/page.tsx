@@ -10,12 +10,18 @@ import { v4 as uuid } from "uuid";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, History } from "lucide-react";
+import { ChevronDown, ChevronUp, History, Clock, Pencil } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { ksh, type Month, type Expense, type Category } from "@/lib/utils";
 
 const CATEGORIES: Category[] = ["Needs", "Wants", "Savings"];
 const today = () => new Date().toLocaleDateString("en-KE");
+const nowStamp = () => new Date().toISOString();
+const formatStamp = (iso: string) =>
+  new Date(iso).toLocaleString("en-KE", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  });
 
 // ─── Stat row ─────────────────────────────────────────────────────────────────
 function StatRow({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
@@ -123,10 +129,10 @@ export default function SalaryPage() {
     const updated = editExpenseId
       ? expenses.map((e) =>
           e.id === editExpenseId
-            ? { ...e, desc, amount: Number(amount), category }
+            ? { ...e, desc, amount: Number(amount), category, editedAt: nowStamp() }
             : e
         )
-      : [...expenses, { id: uuid(), desc, amount: Number(amount), category, date: today() }];
+      : [...expenses, { id: uuid(), desc, amount: Number(amount), category, date: today(), createdAt: nowStamp() }];
 
     await updateDoc(doc(db, "users", user.uid, "months", activeMonth.id), { expenses: updated });
     setDesc("");
@@ -227,7 +233,6 @@ export default function SalaryPage() {
                     key={m.id}
                     className={`border-b last:border-0 transition-colors ${isActive ? "bg-blue-50 -mx-4 px-4" : ""}`}
                   >
-                    {/* Clickable row */}
                     <button
                       onClick={() => selectMonth(m)}
                       className="w-full flex items-center justify-between py-2.5 text-left gap-2"
@@ -244,7 +249,6 @@ export default function SalaryPage() {
                       </div>
                     </button>
 
-                    {/* Edit / Delete — shown when active */}
                     {isActive && (
                       <div className="flex gap-3 pb-2.5 pl-1">
                         <button onClick={() => startEditMonth(m)} className="text-blue-600 text-xs font-medium hover:underline">
@@ -322,7 +326,6 @@ export default function SalaryPage() {
             {/* Expense history — single toggle */}
             <Card>
               <CardContent className="p-4">
-                {/* Header is the toggle */}
                 <button
                   onClick={() => setShowHistory((v) => !v)}
                   className="w-full flex items-center justify-between mb-1"
@@ -352,10 +355,23 @@ export default function SalaryPage() {
                 ) : (
                   <div className="mt-2">
                     {(activeMonth.expenses ?? []).map((e, i) => (
-                      <div key={e.id ?? i} className="flex items-center justify-between border-b last:border-0 py-2 gap-2">
+                      <div key={e.id ?? i} className="flex items-start justify-between border-b last:border-0 py-2 gap-2">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{e.desc}</p>
                           <p className="text-xs text-gray-400">{e.category} · {e.date}</p>
+                          {/* ── Timestamps ── */}
+                          {(e as any).createdAt && (
+                            <span className="flex items-center gap-1 text-[10px] text-gray-400 mt-0.5">
+                              <Clock className="w-2.5 h-2.5 shrink-0" />
+                              Added {formatStamp((e as any).createdAt)}
+                            </span>
+                          )}
+                          {(e as any).editedAt && (
+                            <span className="flex items-center gap-1 text-[10px] text-blue-400">
+                              <Pencil className="w-2.5 h-2.5 shrink-0" />
+                              Edited {formatStamp((e as any).editedAt)}
+                            </span>
+                          )}
                         </div>
                         <span className="text-sm font-semibold text-gray-800 shrink-0">{ksh(e.amount)}</span>
                         <div className="flex gap-2 shrink-0">

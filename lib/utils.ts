@@ -1,11 +1,12 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-import { v4 as uuid } from "uuid";
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
+// ─── Tailwind class merge helper ──────────────────────────────────────────────
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
-// ─── Currency formatter ───────────────────────────────────────
+
+// ─── Currency formatter ───────────────────────────────────────────────────────
 export const ksh = (n: number) =>
   new Intl.NumberFormat("en-KE", {
     style: "currency",
@@ -13,7 +14,22 @@ export const ksh = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n);
 
-// ─── Shared types ─────────────────────────────────────────────
+// ─── Timestamp helpers ────────────────────────────────────────────────────────
+export const nowStamp = () => new Date().toISOString();
+
+export const formatStamp = (iso: string) => {
+  const d = new Date(iso);
+  return d.toLocaleString("en-KE", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+// ─── Shared types ─────────────────────────────────────────────────────────────
 export type Category = "Needs" | "Wants" | "Savings";
 
 export type Expense = {
@@ -22,6 +38,8 @@ export type Expense = {
   amount: number;
   date: string;
   category: Category;
+  createdAt: string;
+  editedAt?: string;
 };
 
 export type Month = {
@@ -37,6 +55,8 @@ export type Sale = {
   buyer: string;
   amount: number;
   date: string;
+  createdAt: string;
+  editedAt?: string;
 };
 
 export type HustleExpense = {
@@ -44,6 +64,8 @@ export type HustleExpense = {
   desc: string;
   amount: number;
   date: string;
+  createdAt: string;
+  editedAt?: string;
 };
 
 export type Capital = {
