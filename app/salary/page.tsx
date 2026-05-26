@@ -36,6 +36,37 @@ function StatRow({ label, value, highlight }: { label: string; value: number; hi
   );
 }
 
+function downloadMonthAnalysis(month: Month) {
+  const expenses = month.expenses ?? [];
+
+  const totalExpenses = expenses.reduce(
+    (sum, e) => sum + Number(e.amount || 0),
+    0
+  );
+
+  const analysis = {
+    month: month.month,
+    salary: month.salary,
+    totalExpenses,
+    balance: month.salary - totalExpenses,
+    expenseCount: expenses.length,
+  };
+
+  const headers = Object.keys(analysis).join(",");
+  const values = Object.values(analysis).join(",");
+  const csv = `${headers}\n${values}`;
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `analysis-${month.month}.csv`;
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function SalaryPage() {
   const user = useRequireAuth();
@@ -276,6 +307,10 @@ export default function SalaryPage() {
                 <StatRow label="Salary" value={activeMonth.salary} />
                 <StatRow label="Total expenses" value={totalExpenses} />
                 <StatRow label="Balance" value={balance} highlight />
+
+                <Button className="mt-5 bg-blue-800" onClick={() => downloadMonthAnalysis(activeMonth)}>
+  Download Analysis
+</Button>
               </CardContent>
             </Card>
 
